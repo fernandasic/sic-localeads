@@ -5,16 +5,26 @@ import Header from '@/components/Header';
 import SearchForm from '@/components/SearchForm';
 import ResultsList, { Business } from '@/components/ResultsList';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { Save } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
 const Index = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<Business[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastSearchParams, setLastSearchParams] = useState<{
+    address: string;
+    radius: number;
+    type: string;
+  } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Redirecionar para login se não estiver autenticado
   useEffect(() => {
@@ -33,6 +43,7 @@ const Index = () => {
     setHasSearched(true);
     setResults([]);
     setError(null);
+    setLastSearchParams({ address, radius, type });
 
     try {
       const { data, error: funcError } = await supabase.functions.invoke("google-maps-proxy", {
@@ -50,7 +61,7 @@ const Index = () => {
         setResults(data.results);
         
         // Salvar histórico de pesquisa
-        await supabase
+        const { error: historyError } = await supabase
           .from('search_history')
           .insert({
             user_id: user.id,
@@ -59,6 +70,10 @@ const Index = () => {
             business_type: type,
             results_count: data.results.length
           });
+
+        if (historyError) {
+          console.error('Erro ao salvar histórico:', historyError);
+        }
 
         if (data.results.length === 0) {
           // ResultsList já lida com isso
@@ -70,6 +85,56 @@ const Index = () => {
       setError("Erro ao executar a busca: " + String(err));
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSaveResults = async () => {
+    if (!user || !lastSearchParams || results.length === 0) {
+      toast({
+        title: "Erro",
+        description: "Não há resultados para salvar",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const companiesData = results.map(business => ({
+        user_id: user.id,
+        name: business.name,
+        address: business.address,
+        phone: business.phone || null,
+        website: business.website || null,
+        instagram: business.instagram || null,
+        whatsapp: business.whatsapp || null,
+      }));
+
+      const { error: saveError } = await supabase
+        .from('companies')
+        .insert(companiesData);
+
+      if (saveError) {
+        toast({
+          title: "Erro",
+          description: "Erro ao salvar empresas: " + saveError.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Sucesso",
+          description: `${results.length} empresas salvas com sucesso!`,
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao salvar: " + String(err),
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -130,7 +195,23 @@ const Index = () => {
                 {error}
               </div>
             )}
-            {!isLoading && hasSearched && !error && <ResultsList results={results} />}
+            {!isLoading && hasSearched && !error && (
+              <div className="w-full max-w-4xl">
+                {results.length > 0 && (
+                  <div className="mb-4 flex justify-end">
+                    <Button 
+                      onClick={handleSaveResults}
+                      disabled={isSaving}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      <Save className="mr-2 h-4 w-4" />
+                      {isSaving ? 'Salvando...' : 'Salvar Lista'}
+                    </Button>
+                  </div>
+                )}
+                <ResultsList results={results} />
+              </div>
+            )}
           </div>
         </section>
       </main>
