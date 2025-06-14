@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
@@ -8,7 +7,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Save } from 'lucide-react';
+import { Save, FolderOpen, Download } from 'lucide-react';
+import SavedListsModal from '@/components/SavedListsModal';
+import { downloadCSV } from '@/utils/csvDownload';
 import { useToast } from '@/components/ui/use-toast';
 
 const Index = () => {
@@ -25,6 +26,7 @@ const Index = () => {
     type: string;
   } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [savedListsModalOpen, setSavedListsModalOpen] = useState(false);
 
   // Redirecionar para login se não estiver autenticado
   useEffect(() => {
@@ -89,30 +91,27 @@ const Index = () => {
     setIsSaving(true);
 
     try {
-      // Salvar apenas os dados básicos das empresas que existem na tabela atual
-      const companiesData = results.map(business => ({
-        name: business.name,
-        address: business.address,
-        phone: business.phone || null,
-        website: business.website || null,
-        instagram: business.instagram || null,
-        whatsapp: business.whatsapp || null,
-      }));
-
+      const listName = `Lista ${lastSearchParams.type} - ${new Date().toLocaleDateString('pt-BR')}`;
+      
       const { error: saveError } = await supabase
-        .from('companies')
-        .insert(companiesData);
+        .from('saved_lists')
+        .insert({
+          user_id: user.id,
+          name: listName,
+          search_params: lastSearchParams,
+          companies: results
+        });
 
       if (saveError) {
         toast({
           title: "Erro",
-          description: "Erro ao salvar empresas: " + saveError.message,
+          description: "Erro ao salvar lista: " + saveError.message,
           variant: "destructive",
         });
       } else {
         toast({
           title: "Sucesso",
-          description: `${results.length} empresas salvas com sucesso!`,
+          description: `Lista salva com sucesso como "${listName}"!`,
         });
       }
     } catch (err: any) {
@@ -124,6 +123,33 @@ const Index = () => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleLoadSavedList = (companies: any[]) => {
+    setResults(companies);
+    setHasSearched(true);
+  };
+
+  const handleDownloadCSV = () => {
+    if (results.length === 0) {
+      toast({
+        title: "Erro",
+        description: "Não há resultados para fazer download",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const filename = lastSearchParams 
+      ? `empresas_${lastSearchParams.type}_${lastSearchParams.address.replace(/\s+/g, '_')}`
+      : 'empresas';
+    
+    downloadCSV(results, filename);
+    
+    toast({
+      title: "Sucesso",
+      description: "Download do CSV iniciado!",
+    });
   };
 
   const LoadingSkeletons = () => (
@@ -186,15 +212,35 @@ const Index = () => {
             {!isLoading && hasSearched && !error && (
               <div className="w-full max-w-4xl">
                 {results.length > 0 && (
-                  <div className="mb-4 flex justify-end">
-                    <Button 
-                      onClick={handleSaveResults}
-                      disabled={isSaving}
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                    >
-                      <Save className="mr-2 h-4 w-4" />
-                      {isSaving ? 'Salvando...' : 'Salvar Lista'}
-                    </Button>
+                  <div className="mb-4 flex justify-between items-center">
+                    <div className="flex gap-2">
+                      <Button 
+                        onClick={() => setSavedListsModalOpen(true)}
+                        variant="outline"
+                        className="text-blue-600 hover:text-blue-700"
+                      >
+                        <FolderOpen className="mr-2 h-4 w-4" />
+                        Ver Listas Salvas
+                      </Button>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        onClick={handleDownloadCSV}
+                        variant="outline"
+                        className="text-green-600 hover:text-green-700"
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Download CSV
+                      </Button>
+                      <Button 
+                        onClick={handleSaveResults}
+                        disabled={isSaving}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        <Save className="mr-2 h-4 w-4" />
+                        {isSaving ? 'Salvando...' : 'Salvar Lista'}
+                      </Button>
+                    </div>
                   </div>
                 )}
                 <ResultsList results={results} />
@@ -203,6 +249,12 @@ const Index = () => {
           </div>
         </section>
       </main>
+      
+      <SavedListsModal 
+        isOpen={savedListsModalOpen}
+        onClose={() => setSavedListsModalOpen(false)}
+        onLoadList={handleLoadSavedList}
+      />
     </div>
   );
 };

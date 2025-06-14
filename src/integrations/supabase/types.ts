@@ -42,6 +42,33 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_lists: {
+        Row: {
+          companies: Json
+          created_at: string
+          id: string
+          name: string
+          search_params: Json
+          user_id: string
+        }
+        Insert: {
+          companies: Json
+          created_at?: string
+          id?: string
+          name: string
+          search_params: Json
+          user_id: string
+        }
+        Update: {
+          companies?: Json
+          created_at?: string
+          id?: string
+          name?: string
+          search_params?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
