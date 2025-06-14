@@ -1,23 +1,34 @@
+
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
-import ApiKeyModal from '@/components/ApiKeyModal';
 import SearchForm from '@/components/SearchForm';
 import ResultsList, { Business } from '@/components/ResultsList';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 const Index = () => {
-  // removemos apiKey pois não é mais necessário  
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<Business[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Modal de API Key não é mais necessário, mas mantido para compatibilidade/opção futura.
-  useEffect(() => {}, []);
+  // Redirecionar para login se não estiver autenticado
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/auth');
+    }
+  }, [user, authLoading, navigate]);
 
   const handleSearch = async (address: string, radius: number, type: string) => {
+    if (!user) {
+      setError('Você precisa estar logado para fazer pesquisas');
+      return;
+    }
+
     setIsLoading(true);
     setHasSearched(true);
     setResults([]);
@@ -29,7 +40,6 @@ const Index = () => {
       });
 
       if (funcError) {
-        // This is a fallback for unexpected communication errors.
         setError("Erro na comunicação com o servidor: " + funcError.message);
         return;
       }
@@ -38,9 +48,20 @@ const Index = () => {
         setError("Erro: " + data.error);
       } else if (data?.results) {
         setResults(data.results);
+        
+        // Salvar histórico de pesquisa
+        await supabase
+          .from('search_history')
+          .insert({
+            user_id: user.id,
+            address,
+            radius,
+            business_type: type,
+            results_count: data.results.length
+          });
+
         if (data.results.length === 0) {
-          // You can choose to show a message here or let ResultsList handle it.
-          // setError("Nenhum resultado encontrado para esta busca.");
+          // ResultsList já lida com isso
         }
       } else {
         setError("Recebida uma resposta inesperada do servidor.");
@@ -67,6 +88,23 @@ const Index = () => {
       ))}
     </div>
   );
+
+  // Mostrar loading enquanto verifica autenticação
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Skeleton className="h-8 w-48 mx-auto mb-4" />
+          <Skeleton className="h-4 w-32 mx-auto" />
+        </div>
+      </div>
+    );
+  }
+
+  // Se não estiver autenticado, não renderizar nada (será redirecionado)
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 text-foreground">
@@ -96,12 +134,6 @@ const Index = () => {
           </div>
         </section>
       </main>
-      {/* ApiKeyModal mantido, mas não usado mais */}
-      <ApiKeyModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={() => setIsModalOpen(false)}
-      />
     </div>
   );
 };
