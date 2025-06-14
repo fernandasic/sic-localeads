@@ -1,23 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import ApiKeyModal from '@/components/ApiKeyModal';
 import SearchForm from '@/components/SearchForm';
 import ResultsList, { Business } from '@/components/ResultsList';
 import { Skeleton } from '@/components/ui/skeleton';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = window.location.origin.includes("localhost")
-  ? import.meta.env.VITE_SUPABASE_URL
-  : "https://cehoymbdlrypvrulmbyd.supabase.co";
-const supabaseAnonKey = window.location.origin.includes("localhost")
-  ? import.meta.env.VITE_SUPABASE_ANON_KEY
-  : "YOUR_SUPABASE_ANON_KEY"; // troque por variáveis de ambiente se necessário
-
-const supabase = createClient(
-  supabaseUrl,
-  supabaseAnonKey
-);
+import { supabase } from '@/integrations/supabase/client';
 
 const Index = () => {
   // removemos apiKey pois não é mais necessário  
