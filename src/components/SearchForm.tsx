@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
-import { MapPin, Search } from 'lucide-react';
+import { MapPin, Search, Plus } from 'lucide-react';
 
 const businessTypes = [
   { value: 'doctor', label: 'Médicos' },
@@ -24,9 +24,22 @@ interface SearchFormProps {
 }
 
 const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
+  const [newSegment, setNewSegment] = useState('');
+  const [customBusinessTypes, setCustomBusinessTypes] = useState(businessTypes);
   const [address, setAddress] = useState('');
   const [radius, setRadius] = useState([5]);
   const [type, setType] = useState('doctor');
+
+  const handleAddSegment = () => {
+    if (newSegment.trim()) {
+      const newType = {
+        value: newSegment.toLowerCase().replace(/\s+/g, '_'),
+        label: newSegment.trim()
+      };
+      setCustomBusinessTypes([...customBusinessTypes, newType]);
+      setNewSegment('');
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,13 +52,28 @@ const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-end">
             <div className="space-y-2">
+              <Label htmlFor="newSegment">Novo segmento</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="newSegment"
+                  value={newSegment}
+                  onChange={(e) => setNewSegment(e.target.value)}
+                  placeholder="Digite um novo segmento"
+                />
+                <Button type="button" onClick={handleAddSegment} size="sm">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="type">Tipo de empresa</Label>
               <Select value={type} onValueChange={setType}>
                 <SelectTrigger id="type">
                   <SelectValue placeholder="Selecione um setor" />
                 </SelectTrigger>
                 <SelectContent>
-                  {businessTypes.map((bt) => (
+                  {customBusinessTypes.map((bt) => (
                     <SelectItem key={bt.value} value={bt.value}>{bt.label}</SelectItem>
                   ))}
                 </SelectContent>
