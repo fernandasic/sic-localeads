@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -5,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
-import { MapPin, Search, Briefcase } from 'lucide-react';
+import { MapPin, Search } from 'lucide-react';
 
 const businessTypes = [
   { value: 'doctor', label: 'Médicos' },
@@ -25,7 +26,7 @@ interface SearchFormProps {
 const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
   const [address, setAddress] = useState('');
   const [radius, setRadius] = useState([5]);
-  const [type, setType] = useState('');
+  const [type, setType] = useState('doctor');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,17 +40,16 @@ const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-end">
             <div className="space-y-2">
               <Label htmlFor="type">Tipo de empresa</Label>
-              <div className="relative">
-                 <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  id="type"
-                  value={type}
-                  onChange={(e) => setType(e.target.value)}
-                  placeholder="Ex: restaurant, lawyer (em inglês)"
-                  required
-                  className="pl-10"
-                />
-              </div>
+              <Select value={type} onValueChange={setType}>
+                <SelectTrigger id="type">
+                  <SelectValue placeholder="Selecione um setor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {businessTypes.map((bt) => (
+                    <SelectItem key={bt.value} value={bt.value}>{bt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
