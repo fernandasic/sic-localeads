@@ -6,23 +6,9 @@ import SearchForm from '@/components/SearchForm';
 import ResultsList, { Business } from '@/components/ResultsList';
 import { Skeleton } from '@/components/ui/skeleton';
 
-// Mock data para simular a resposta da API
-const mockResults: Business[] = [
-  {
-    name: 'Contabilidade Exemplo Alfa',
-    address: 'Rua das Flores, 123, São Paulo, SP',
-    phone: '(11) 98765-4321',
-    rating: 4.5,
-    opening_hours: 'Aberto agora',
-  },
-  {
-    name: 'Pet Shop Amigo Fiel',
-    address: 'Av. dos Animais, 456, São Paulo, SP',
-    phone: '(11) 12345-6789',
-    rating: 4.8,
-    opening_hours: 'Fechado',
-  },
-];
+// Removido mockResults, pois agora usaremos dados reais
+
+const GOOGLE_MAPS_PROXY_URL = "https://cehoymbdlrypvrulmbyd.supabase.co/functions/v1/google-maps-proxy";
 
 const Index = () => {
   const [apiKey, setApiKey] = useState<string | null>(null);
@@ -30,6 +16,7 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<Business[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const storedApiKey = localStorage.getItem('googleMapsApiKey');
@@ -46,23 +33,50 @@ const Index = () => {
     setIsModalOpen(false);
   };
 
-  const handleSearch = (address: string, radius: number, type: string) => {
+  const handleSearch = async (address: string, radius: number, type: string) => {
     if (!apiKey) {
       setIsModalOpen(true);
       return;
     }
-    console.log('Buscando por:', { address, radius, type, apiKey });
-
-    // Lógica de chamada à API do Google Maps virá aqui.
-    // Por enquanto, vamos simular uma chamada.
     setIsLoading(true);
     setHasSearched(true);
     setResults([]);
-    setTimeout(() => {
-      // Aqui você substituiria mockResults pelos dados reais da API
-      setResults(mockResults);
+    setError(null);
+
+    try {
+      // Chamada para a edge function do Supabase
+      const res = await fetch(GOOGLE_MAPS_PROXY_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          address,
+          radius,
+          type
+        }),
+      });
+      const data = await res.json();
+
+      if (data?.results) {
+        // Adapter: mapeia a estrutura retornada para o tipo esperado em ResultsList
+        const mapped: Business[] = data.results.map((place: any) => ({
+          name: place.name,
+          address: place.address,
+          rating: place.rating,
+          opening_hours: place.opening_hours,
+        }));
+        setResults(mapped);
+      } else if (data?.error) {
+        setError("Erro: " + data.error);
+      } else {
+        setError("Nenhum resultado encontrado.");
+      }
+    } catch (err: any) {
+      setError("Erro ao buscar empresas: " + String(err));
+    } finally {
       setIsLoading(false);
-    }, 2000);
+    }
   };
   
   const LoadingSkeletons = () => (
@@ -100,7 +114,12 @@ const Index = () => {
           <div className="flex flex-col items-center gap-8">
             <SearchForm onSearch={handleSearch} isLoading={isLoading} />
             {isLoading && <LoadingSkeletons />}
-            {!isLoading && hasSearched && <ResultsList results={results} />}
+            {error && (
+              <div className="w-full max-w-4xl mt-6 text-center text-red-600 bg-red-50 border border-red-200 rounded-lg p-4">
+                {error}
+              </div>
+            )}
+            {!isLoading && hasSearched && !error && <ResultsList results={results} />}
           </div>
         </section>
       </main>
@@ -114,3 +133,4 @@ const Index = () => {
 };
 
 export default Index;
+
