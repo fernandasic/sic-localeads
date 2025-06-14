@@ -5,68 +5,48 @@ import ApiKeyModal from '@/components/ApiKeyModal';
 import SearchForm from '@/components/SearchForm';
 import ResultsList, { Business } from '@/components/ResultsList';
 import { Skeleton } from '@/components/ui/skeleton';
+import { createClient } from '@supabase/supabase-js';
 
-// Removido mockResults, pois agora usaremos dados reais
+const supabaseUrl = window.location.origin.includes("localhost")
+  ? import.meta.env.VITE_SUPABASE_URL
+  : "https://cehoymbdlrypvrulmbyd.supabase.co";
+const supabaseAnonKey = window.location.origin.includes("localhost")
+  ? import.meta.env.VITE_SUPABASE_ANON_KEY
+  : "YOUR_SUPABASE_ANON_KEY"; // troque por variáveis de ambiente se necessário
 
-const GOOGLE_MAPS_PROXY_URL = "https://cehoymbdlrypvrulmbyd.supabase.co/functions/v1/google-maps-proxy";
+const supabase = createClient(
+  supabaseUrl,
+  supabaseAnonKey
+);
 
 const Index = () => {
-  const [apiKey, setApiKey] = useState<string | null>(null);
+  // removemos apiKey pois não é mais necessário  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<Business[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const storedApiKey = localStorage.getItem('googleMapsApiKey');
-    if (storedApiKey) {
-      setApiKey(storedApiKey);
-    } else {
-      setIsModalOpen(true);
-    }
-  }, []);
-
-  const handleSaveApiKey = (key: string) => {
-    localStorage.setItem('googleMapsApiKey', key);
-    setApiKey(key);
-    setIsModalOpen(false);
-  };
+  // Modal de API Key não é mais necessário, mas mantido para compatibilidade/opção futura.
+  useEffect(() => {}, []);
 
   const handleSearch = async (address: string, radius: number, type: string) => {
-    if (!apiKey) {
-      setIsModalOpen(true);
-      return;
-    }
     setIsLoading(true);
     setHasSearched(true);
     setResults([]);
     setError(null);
 
     try {
-      // Chamada para a edge function do Supabase
-      const res = await fetch(GOOGLE_MAPS_PROXY_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          address,
-          radius,
-          type
-        }),
+      const { data, error: funcError } = await supabase.functions.invoke("google-maps-proxy", {
+        body: { address, radius, type },
       });
-      const data = await res.json();
-
+      if (funcError) {
+        setError("Erro: " + funcError.message);
+        return;
+      }
       if (data?.results) {
-        // Adapter: mapeia a estrutura retornada para o tipo esperado em ResultsList
-        const mapped: Business[] = data.results.map((place: any) => ({
-          name: place.name,
-          address: place.address,
-          rating: place.rating,
-          opening_hours: place.opening_hours,
-        }));
-        setResults(mapped);
+        // Adicione informações opcionais: website, instagram (caso venha, pouco provável), whatsapp (caso venha)
+        setResults(data.results);
       } else if (data?.error) {
         setError("Erro: " + data.error);
       } else {
@@ -78,7 +58,7 @@ const Index = () => {
       setIsLoading(false);
     }
   };
-  
+
   const LoadingSkeletons = () => (
     <div className="w-full max-w-4xl space-y-4 mt-8">
       <h2 className="text-2xl font-semibold">Buscando...</h2>
@@ -123,14 +103,14 @@ const Index = () => {
           </div>
         </section>
       </main>
+      {/* ApiKeyModal mantido, mas não usado mais */}
       <ApiKeyModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSave={handleSaveApiKey}
+        onSave={() => setIsModalOpen(false)}
       />
     </div>
   );
 };
 
 export default Index;
-

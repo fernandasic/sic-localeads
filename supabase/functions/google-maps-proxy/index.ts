@@ -38,21 +38,49 @@ serve(async (req) => {
     }
     const { lat, lng } = geocodeData.results[0].geometry.location;
 
-    // Buscar empresas no raio usando Places API
+    // Buscar empresas no raio usando Places API (NearbySearch)
     const placesUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=${type}&key=${googleMapsApiKey}&language=pt-BR`;
     const placesRes = await fetch(placesUrl);
     const placesData = await placesRes.json();
 
-    // Opcional: Limitar campos retornados e simplificar o payload
-    const results = (placesData.results ?? []).map((place: any) => ({
-      name: place.name,
-      address: place.vicinity,
-      rating: place.rating,
-      user_ratings_total: place.user_ratings_total,
-      opening_hours: place.opening_hours?.open_now ? "Aberto agora" : "Fechado",
-      place_id: place.place_id,
-      types: place.types,
-    }));
+    // Para cada resultado, buscar mais detalhes (website, telefone, etc)
+    const resultsPromises = (placesData.results ?? []).map(async (place: any) => {
+      let website = undefined;
+      let phone = undefined;
+      let instagram = undefined;
+      let whatsapp = undefined;
+
+      // Buscar o Place Details
+      try {
+        const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&key=${googleMapsApiKey}&language=pt-BR&fields=website,international_phone_number,url`;
+        const detailsRes = await fetch(detailsUrl);
+        const detailsData = await detailsRes.json();
+        if (detailsData?.result) {
+          website = detailsData.result.website || detailsData.result.url;
+          phone = detailsData.result.international_phone_number;
+          if (website && typeof website === "string") {
+            if (website.includes("instagram.com")) instagram = website;
+            if (website.includes("wa.me") || website.includes("whatsapp")) whatsapp = website;
+          }
+        }
+      } catch (e) {} // Silencioso para casos em que não há detalhes
+
+      return {
+        name: place.name,
+        address: place.vicinity,
+        rating: place.rating,
+        user_ratings_total: place.user_ratings_total,
+        opening_hours: place.opening_hours?.open_now ? "Aberto agora" : "Fechado",
+        place_id: place.place_id,
+        types: place.types,
+        website,
+        phone,
+        instagram,
+        whatsapp,
+      };
+    });
+
+    const results = await Promise.all(resultsPromises);
 
     return new Response(JSON.stringify({ results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

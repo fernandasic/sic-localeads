@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Star, Phone, MapPin, Clock } from 'lucide-react';
+import { Star, Phone, MapPin, Clock, Globe } from 'lucide-react';
 
 export interface Business {
   name: string;
@@ -9,6 +9,9 @@ export interface Business {
   phone?: string;
   rating?: number;
   opening_hours?: string;
+  website?: string;
+  instagram?: string;
+  whatsapp?: string;
 }
 
 interface ResultsListProps {
@@ -57,6 +60,45 @@ const ResultsList = ({ results }: ResultsListProps) => {
                <div className="flex items-center text-sm text-muted-foreground">
                 <Clock className="h-4 w-4 mr-2" />
                 <span>{business.opening_hours}</span>
+              </div>
+            )}
+            {business.website && (
+              <div className="flex items-center text-sm">
+                <Globe className="h-4 w-4 mr-2" />
+                <a
+                  href={business.website}
+                  target="_blank"
+                  className="text-cyan-700 underline"
+                  rel="noopener noreferrer"
+                >
+                  Site
+                </a>
+              </div>
+            )}
+            {business.instagram && (
+              <div className="flex items-center text-sm">
+                <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/instagram.svg" alt="Instagram" className="h-4 w-4 mr-2" />
+                <a
+                  href={business.instagram}
+                  target="_blank"
+                  className="text-pink-600 underline"
+                  rel="noopener noreferrer"
+                >
+                  Instagram
+                </a>
+              </div>
+            )}
+            {business.whatsapp && (
+              <div className="flex items-center text-sm">
+                <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/whatsapp.svg" alt="WhatsApp" className="h-4 w-4 mr-2" />
+                <a
+                  href={business.whatsapp}
+                  target="_blank"
+                  className="text-green-600 underline"
+                  rel="noopener noreferrer"
+                >
+                  WhatsApp
+                </a>
               </div>
             )}
           </CardContent>
