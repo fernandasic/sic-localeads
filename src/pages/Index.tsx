@@ -66,7 +66,7 @@ const Index = () => {
   };
   
   const LoadingSkeletons = () => (
-    <div className="w-full max-w-4xl space-y-4">
+    <div className="w-full max-w-4xl space-y-4 mt-8">
       <h2 className="text-2xl font-semibold">Buscando...</h2>
       {[...Array(3)].map((_, i) => (
         <div key={i} className="p-6 border rounded-lg space-y-4">
@@ -82,12 +82,27 @@ const Index = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <Header onSettingsClick={() => setIsModalOpen(true)} />
-      <main className="container mx-auto py-8 flex flex-col items-center gap-8">
-        <SearchForm onSearch={handleSearch} isLoading={isLoading} />
-        {isLoading && <LoadingSkeletons />}
-        {!isLoading && hasSearched && <ResultsList results={results} />}
+    <div className="min-h-screen bg-gray-50 text-foreground">
+      <Header />
+      <main>
+        <section className="bg-sky-100/80 pt-16 pb-24">
+          <div className="container mx-auto text-center">
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-gray-800">
+              Encontre empresas locais para prospecção
+            </h1>
+            <p className="mt-4 text-lg text-muted-foreground max-w-3xl mx-auto">
+              Defina o tipo de negócio e a localização para encontrar potenciais clientes para sua estratégia de vendas.
+            </p>
+          </div>
+        </section>
+        
+        <section className="container mx-auto -mt-16">
+          <div className="flex flex-col items-center gap-8">
+            <SearchForm onSearch={handleSearch} isLoading={isLoading} />
+            {isLoading && <LoadingSkeletons />}
+            {!isLoading && hasSearched && <ResultsList results={results} />}
+          </div>
+        </section>
       </main>
       <ApiKeyModal
         isOpen={isModalOpen}
