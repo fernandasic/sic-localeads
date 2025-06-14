@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import ApiKeyModal from '@/components/ApiKeyModal';
@@ -6,9 +5,6 @@ import SearchForm from '@/components/SearchForm';
 import ResultsList, { Business } from '@/components/ResultsList';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
-import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
 
 const Index = () => {
   // removemos apiKey pois não é mais necessário  
@@ -90,16 +86,6 @@ const Index = () => {
         <section className="container mx-auto -mt-16">
           <div className="flex flex-col items-center gap-8">
             <SearchForm onSearch={handleSearch} isLoading={isLoading} />
-            
-            <div className="w-full max-w-4xl text-center -mt-4 mb-4">
-                <Button asChild variant="outline">
-                  <Link to="/add-company">
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Cadastrar Empresa Manualmente
-                  </Link>
-                </Button>
-            </div>
-            
             {isLoading && <LoadingSkeletons />}
             {error && (
               <div className="w-full max-w-4xl mt-6 text-center text-red-600 bg-red-50 border border-red-200 rounded-lg p-4">
