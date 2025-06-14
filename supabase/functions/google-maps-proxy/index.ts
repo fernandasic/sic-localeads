@@ -17,13 +17,22 @@ serve(async (req) => {
 
   try {
     if (!googleMapsApiKey) {
-      return new Response(JSON.stringify({ error: "GOOGLE_MAPS_API_KEY não configurada no Supabase Secrets" }), {
-        status: 500,
+      const errorPayload = { error: "GOOGLE_MAPS_API_KEY não configurada no Supabase Secrets" };
+      return new Response(JSON.stringify(errorPayload), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const { address, radius, type } = await req.json();
+
+    if (!address || !radius || !type) {
+        const errorPayload = { error: "Parâmetros 'address', 'radius' ou 'type' ausentes no corpo da requisição." };
+        return new Response(JSON.stringify(errorPayload), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+    }
 
     // Consultar a API de Geocoding para converter endereço em latitude/longitude
     const geocodeRes = await fetch(
@@ -31,8 +40,9 @@ serve(async (req) => {
     );
     const geocodeData = await geocodeRes.json();
     if (geocodeData.status !== "OK" || !geocodeData.results?.[0]?.geometry?.location) {
-      return new Response(JSON.stringify({ error: "Endereço não encontrado" }), {
-        status: 400,
+      const errorPayload = { error: `Endereço não encontrado ou erro na geolocalização: ${geocodeData.status}` };
+      return new Response(JSON.stringify(errorPayload), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -42,6 +52,14 @@ serve(async (req) => {
     const placesUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=${type}&key=${googleMapsApiKey}&language=pt-BR`;
     const placesRes = await fetch(placesUrl);
     const placesData = await placesRes.json();
+
+    if (placesData.status !== "OK" && placesData.status !== "ZERO_RESULTS") {
+      const errorPayload = { error: `Erro ao buscar locais: ${placesData.status} - ${placesData.error_message || 'Erro desconhecido da API do Google'}` };
+      return new Response(JSON.stringify(errorPayload), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Para cada resultado, buscar mais detalhes (website, telefone, etc)
     const resultsPromises = (placesData.results ?? []).map(async (place: any) => {
@@ -63,7 +81,9 @@ serve(async (req) => {
             if (website.includes("wa.me") || website.includes("whatsapp")) whatsapp = website;
           }
         }
-      } catch (e) {} // Silencioso para casos em que não há detalhes
+      } catch (e) {
+        console.error(`[google-maps-proxy] Error fetching details for place_id ${place.place_id}:`, e);
+      }
 
       return {
         name: place.name,
@@ -87,8 +107,9 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("Erro na função google-maps-proxy:", error);
-    return new Response(JSON.stringify({ error: String(error) }), {
-      status: 500,
+    const errorPayload = { error: `Erro interno da função: ${String(error)}` };
+    return new Response(JSON.stringify(errorPayload), {
+      status: 200, // Always 200
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

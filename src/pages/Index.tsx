@@ -40,20 +40,26 @@ const Index = () => {
       const { data, error: funcError } = await supabase.functions.invoke("google-maps-proxy", {
         body: { address, radius, type },
       });
+
       if (funcError) {
-        setError("Erro: " + funcError.message);
+        // This is a fallback for unexpected communication errors.
+        setError("Erro na comunicação com o servidor: " + funcError.message);
         return;
       }
-      if (data?.results) {
-        // Adicione informações opcionais: website, instagram (caso venha, pouco provável), whatsapp (caso venha)
-        setResults(data.results);
-      } else if (data?.error) {
+
+      if (data?.error) {
         setError("Erro: " + data.error);
+      } else if (data?.results) {
+        setResults(data.results);
+        if (data.results.length === 0) {
+          // You can choose to show a message here or let ResultsList handle it.
+          // setError("Nenhum resultado encontrado para esta busca.");
+        }
       } else {
-        setError("Nenhum resultado encontrado.");
+        setError("Recebida uma resposta inesperada do servidor.");
       }
     } catch (err: any) {
-      setError("Erro ao buscar empresas: " + String(err));
+      setError("Erro ao executar a busca: " + String(err));
     } finally {
       setIsLoading(false);
     }
