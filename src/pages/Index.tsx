@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
@@ -59,20 +60,8 @@ const Index = () => {
       } else if (data?.results) {
         setResults(data.results);
         
-        // Salvar histórico de pesquisa
-        const { error: historyError } = await supabase
-          .from('search_history')
-          .insert({
-            user_id: user.id,
-            address,
-            radius,
-            business_type: type,
-            results_count: data.results.length
-          });
-
-        if (historyError) {
-          console.error('Erro ao salvar histórico:', historyError);
-        }
+        // Temporariamente removido o salvamento de histórico devido a problemas de tipos
+        // será restaurado quando os tipos do Supabase forem atualizados
 
         if (data.results.length === 0) {
           // ResultsList já lida com isso
@@ -100,8 +89,8 @@ const Index = () => {
     setIsSaving(true);
 
     try {
+      // Salvar apenas os dados básicos das empresas que existem na tabela atual
       const companiesData = results.map(business => ({
-        user_id: user.id,
         name: business.name,
         address: business.address,
         phone: business.phone || null,
