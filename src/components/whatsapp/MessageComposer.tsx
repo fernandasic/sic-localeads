@@ -6,8 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Eye, Image, FileText } from 'lucide-react';
 
-const MessageComposer = () => {
-  const [message, setMessage] = useState('');
+interface MessageComposerProps {
+  message: string;
+  onMessageChange: (message: string) => void;
+}
+
+const MessageComposer = ({ message, onMessageChange }: MessageComposerProps) => {
   const [attachments, setAttachments] = useState<File[]>([]);
   const [showPreview, setShowPreview] = useState(false);
 
@@ -31,7 +35,7 @@ const MessageComposer = () => {
           <Textarea
             placeholder="Digite sua mensagem aqui..."
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={(e) => onMessageChange(e.target.value)}
             className="min-h-32"
           />
           <div className="flex justify-between items-center mt-2">

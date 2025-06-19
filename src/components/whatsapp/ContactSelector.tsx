@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -6,8 +5,12 @@ import { Badge } from '@/components/ui/badge';
 import SavedListsModal from '@/components/SavedListsModal';
 import { Upload, FolderOpen, Users } from 'lucide-react';
 
-const ContactSelector = () => {
-  const [selectedContacts, setSelectedContacts] = useState<any[]>([]);
+interface ContactSelectorProps {
+  selectedContacts: any[];
+  onContactsChange: (contacts: any[]) => void;
+}
+
+const ContactSelector = ({ selectedContacts, onContactsChange }: ContactSelectorProps) => {
   const [savedListsModalOpen, setSavedListsModalOpen] = useState(false);
 
   const handleLoadSavedList = (companies: any[]) => {
@@ -17,7 +20,7 @@ const ContactSelector = () => {
       source: 'saved_list'
     })).filter(contact => contact.phone);
     
-    setSelectedContacts(contacts);
+    onContactsChange(contacts);
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,7 +36,7 @@ const ContactSelector = () => {
         return { name: name?.trim(), phone: phone?.trim(), source: 'csv' };
       }).filter(contact => contact.name && contact.phone);
       
-      setSelectedContacts(prev => [...prev, ...contacts]);
+      onContactsChange([...selectedContacts, ...contacts]);
     };
     reader.readAsText(file);
   };
@@ -102,7 +105,7 @@ const ContactSelector = () => {
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => setSelectedContacts([])}
+              onClick={() => onContactsChange([])}
             >
               Limpar Todos
             </Button>

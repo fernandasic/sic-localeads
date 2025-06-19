@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw } from 'lucide-react';
+import { Trash2, RefreshCw, CheckCircle } from 'lucide-react';
 
 interface WhatsAppInstance {
   id: string;
@@ -14,16 +14,30 @@ interface WhatsAppInstance {
   created_at: string;
 }
 
-const InstanceManager = () => {
+interface InstanceManagerProps {
+  onInstanceSelect?: (instanceId: string | null) => void;
+}
+
+const InstanceManager = ({ onInstanceSelect }: InstanceManagerProps) => {
   const { user } = useAuth();
   const [instances, setInstances] = useState<WhatsAppInstance[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
       loadInstances();
     }
   }, [user]);
+
+  useEffect(() => {
+    // Auto-selecionar primeira instância conectada
+    const connectedInstance = instances.find(inst => inst.status === 'connected');
+    if (connectedInstance && !selectedInstanceId) {
+      setSelectedInstanceId(connectedInstance.instance_id);
+      onInstanceSelect?.(connectedInstance.instance_id);
+    }
+  }, [instances, selectedInstanceId, onInstanceSelect]);
 
   const loadInstances = async () => {
     if (!user) return;
@@ -45,6 +59,11 @@ const InstanceManager = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const selectInstance = (instanceId: string) => {
+    setSelectedInstanceId(instanceId);
+    onInstanceSelect?.(instanceId);
   };
 
   const getStatusBadge = (status: string) => {
@@ -81,16 +100,29 @@ const InstanceManager = () => {
   return (
     <div className="space-y-3">
       {instances.map((instance) => (
-        <div key={instance.id} className="border rounded-lg p-3 space-y-2">
+        <div 
+          key={instance.id} 
+          className={`border rounded-lg p-3 space-y-2 cursor-pointer transition-colors ${
+            selectedInstanceId === instance.instance_id 
+              ? 'border-primary bg-primary/5' 
+              : 'hover:border-gray-300'
+          }`}
+          onClick={() => instance.status === 'connected' && selectInstance(instance.instance_id)}
+        >
           <div className="flex justify-between items-start">
-            <div>
-              <p className="font-medium text-sm">{instance.instance_id}</p>
-              {instance.phone_number && (
-                <p className="text-sm text-gray-600">{instance.phone_number}</p>
+            <div className="flex items-center gap-2">
+              {selectedInstanceId === instance.instance_id && (
+                <CheckCircle className="h-4 w-4 text-primary" />
               )}
-              <p className="text-xs text-gray-500">
-                {new Date(instance.created_at).toLocaleString('pt-BR')}
-              </p>
+              <div>
+                <p className="font-medium text-sm">{instance.instance_id}</p>
+                {instance.phone_number && (
+                  <p className="text-sm text-gray-600">{instance.phone_number}</p>
+                )}
+                <p className="text-xs text-gray-500">
+                  {new Date(instance.created_at).toLocaleString('pt-BR')}
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               {getStatusBadge(instance.status)}
@@ -98,7 +130,12 @@ const InstanceManager = () => {
           </div>
           
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" className="flex-1">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="flex-1"
+              disabled={instance.status !== 'connected'}
+            >
               <RefreshCw className="h-3 w-3 mr-1" />
               Reconectar
             </Button>

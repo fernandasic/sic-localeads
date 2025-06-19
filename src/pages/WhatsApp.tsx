@@ -3,19 +3,22 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
 import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import QRCodeManager from '@/components/whatsapp/QRCodeManager';
 import InstanceManager from '@/components/whatsapp/InstanceManager';
 import MessageComposer from '@/components/whatsapp/MessageComposer';
 import ContactSelector from '@/components/whatsapp/ContactSelector';
+import BulkSender from '@/components/whatsapp/BulkSender';
 import { Smartphone, MessageSquare, Users, Send } from 'lucide-react';
 
 const WhatsApp = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('instances');
+  const [selectedContacts, setSelectedContacts] = useState<any[]>([]);
+  const [message, setMessage] = useState('');
+  const [connectedInstanceId, setConnectedInstanceId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -91,7 +94,7 @@ const WhatsApp = () => {
                   <CardTitle>Instâncias Ativas</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <InstanceManager />
+                  <InstanceManager onInstanceSelect={setConnectedInstanceId} />
                 </CardContent>
               </Card>
             </div>
@@ -106,7 +109,10 @@ const WhatsApp = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <ContactSelector />
+                <ContactSelector 
+                  selectedContacts={selectedContacts}
+                  onContactsChange={setSelectedContacts}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -120,7 +126,10 @@ const WhatsApp = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <MessageComposer />
+                <MessageComposer 
+                  message={message}
+                  onMessageChange={setMessage}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -134,16 +143,11 @@ const WhatsApp = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8">
-                  <Send className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <h3 className="text-lg font-semibold mb-2">Pronto para Enviar</h3>
-                  <p className="text-gray-600 mb-4">
-                    Configure sua instância, selecione contatos e componha sua mensagem para continuar
-                  </p>
-                  <Button size="lg" className="bg-green-600 hover:bg-green-700">
-                    Iniciar Campanha
-                  </Button>
-                </div>
+                <BulkSender 
+                  selectedContacts={selectedContacts}
+                  message={message}
+                  instanceId={connectedInstanceId}
+                />
               </CardContent>
             </Card>
           </TabsContent>
