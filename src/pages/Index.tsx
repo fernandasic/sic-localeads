@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
@@ -62,9 +63,6 @@ const Index = () => {
       } else if (data?.results) {
         setResults(data.results);
         
-        // Temporariamente removido o salvamento de histórico devido a problemas de tipos
-        // será restaurado quando os tipos do Supabase forem atualizados
-
         if (data.results.length === 0) {
           // ResultsList já lida com isso
         }
@@ -98,8 +96,8 @@ const Index = () => {
         .insert({
           user_id: user.id,
           name: listName,
-          search_params: lastSearchParams,
-          companies: results
+          search_params: lastSearchParams as any,
+          companies: results as any
         });
 
       if (saveError) {

@@ -51,7 +51,12 @@ const SavedListsModal = ({ isOpen, onClose, onLoadList }: SavedListsModalProps) 
           variant: "destructive",
         });
       } else {
-        setSavedLists(data || []);
+        // Garantir que companies é sempre um array
+        const listsWithTypedCompanies = (data || []).map(list => ({
+          ...list,
+          companies: Array.isArray(list.companies) ? list.companies : []
+        }));
+        setSavedLists(listsWithTypedCompanies);
       }
     } catch (err: any) {
       toast({
