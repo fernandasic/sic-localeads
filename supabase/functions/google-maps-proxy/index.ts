@@ -9,6 +9,20 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Mapeamento de segmentos personalizados para tipos da API do Google
+const typeMapping: { [key: string]: string } = {
+  'médicos': 'doctor',
+  'escritórios de contabilidade': 'accounting',
+  'clínicas': 'clinic',
+  'pet shops': 'pet_store',
+  'restaurantes': 'restaurant',
+  'academias': 'gym',
+  'escritórios de advocacia': 'lawyer',
+  'auto escola': 'school', // Mapeamento para Auto Escola
+  'auto escolas': 'school',
+  'escolas de direção': 'school',
+};
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -34,6 +48,8 @@ serve(async (req) => {
         });
     }
 
+    console.log(`[google-maps-proxy] Searching for: ${type} near ${address}`);
+
     // Consultar a API de Geocoding para converter endereço em latitude/longitude
     const geocodeRes = await fetch(
       `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${googleMapsApiKey}`
@@ -48,8 +64,22 @@ serve(async (req) => {
     }
     const { lat, lng } = geocodeData.results[0].geometry.location;
 
-    // Buscar empresas no raio usando Places API (NearbySearch)
-    const placesUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=${type}&key=${googleMapsApiKey}&language=pt-BR`;
+    // Determinar o tipo de pesquisa
+    const lowerType = type.toLowerCase();
+    const mappedType = typeMapping[lowerType];
+    
+    let placesUrl: string;
+    
+    if (mappedType) {
+      // Usar tipo mapeado se disponível
+      placesUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=${mappedType}&key=${googleMapsApiKey}&language=pt-BR`;
+      console.log(`[google-maps-proxy] Using mapped type: ${mappedType} for search term: ${type}`);
+    } else {
+      // Usar busca por palavra-chave para segmentos personalizados
+      placesUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&keyword=${encodeURIComponent(type)}&key=${googleMapsApiKey}&language=pt-BR`;
+      console.log(`[google-maps-proxy] Using keyword search for: ${type}`);
+    }
+
     const placesRes = await fetch(placesUrl);
     const placesData = await placesRes.json();
 
@@ -60,6 +90,8 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    console.log(`[google-maps-proxy] Found ${placesData.results?.length || 0} results for: ${type}`);
 
     // Para cada resultado, buscar mais detalhes (website, telefone, etc)
     const resultsPromises = (placesData.results ?? []).map(async (place: any) => {
