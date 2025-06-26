@@ -37,13 +37,17 @@ const SearchForm = ({ onSearch, isLoading }: SearchFormProps) => {
         label: newSegment.trim()
       };
       setCustomBusinessTypes([...customBusinessTypes, newType]);
+      setType(newType.value); // Selecionar automaticamente o novo segmento
       setNewSegment('');
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSearch(address, radius[0] * 1000, type); // Convert km to meters
+    // Encontrar o tipo selecionado na lista de tipos personalizados
+    const selectedType = customBusinessTypes.find(bt => bt.value === type);
+    const searchType = selectedType ? selectedType.label : type;
+    onSearch(address, radius[0] * 1000, searchType); // Usar o label do tipo para a pesquisa
   };
 
   return (
