@@ -36,7 +36,7 @@ const QRCodeManager = () => {
       });
 
       // Enviar dados para o webhook n8n
-      const webhookResponse = await fetch('https://n8nsic.agentessic.com/webhook-test/qrcode', {
+      const webhookResponse = await fetch('https://webhookn8nsic.agentessic.com/webhook/qrcode', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
