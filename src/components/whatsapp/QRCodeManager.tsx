@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,7 +36,7 @@ const QRCodeManager = () => {
       });
 
       // Enviar dados para o webhook n8n
-      const webhookResponse = await fetch('https://webhookn8nsic.agentessic.com/webhook/qrcode', {
+      const webhookResponse = await fetch('https://n8nsic.agentessic.com/webhook-test/qrcode', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
