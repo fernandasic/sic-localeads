@@ -51,11 +51,22 @@ const InstanceManager = ({ onInstanceSelect }: InstanceManagerProps) => {
 
       if (error) {
         console.error('Erro ao carregar instâncias:', error);
+        setInstances([]);
       } else {
-        setInstances((data as WhatsAppInstance[]) || []);
+        // Garantir que os dados estão no formato correto
+        const validInstances = (data || []).map((item: any) => ({
+          id: item.id,
+          instance_id: item.instance_id,
+          phone_number: item.phone_number || null,
+          status: item.status || 'pending',
+          created_at: item.created_at
+        })) as WhatsAppInstance[];
+        
+        setInstances(validInstances);
       }
     } catch (err) {
       console.error('Erro inesperado:', err);
+      setInstances([]);
     } finally {
       setLoading(false);
     }

@@ -5,16 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { QrCode, Smartphone, CheckCircle } from 'lucide-react';
-
-interface WhatsAppInstance {
-  id: string;
-  instance_id: string;
-  phone_number: string | null;
-  status: 'pending' | 'connected' | 'disconnected';
-  created_at: string;
-}
 
 const QRCodeManager = () => {
   const { user } = useAuth();
@@ -36,7 +28,14 @@ const QRCodeManager = () => {
     }
 
     setIsGenerating(true);
+    
     try {
+      console.log('Enviando dados para webhook:', {
+        instanceName: instanceName.trim(),
+        userId: user.id,
+        userEmail: user.email
+      });
+
       // Enviar dados para o webhook n8n
       const webhookResponse = await fetch('https://webhookn8nsic.agentessic.com/webhook/qrcode', {
         method: 'POST',
@@ -50,27 +49,37 @@ const QRCodeManager = () => {
         })
       });
 
+      console.log('Status da resposta do webhook:', webhookResponse.status);
+
       if (!webhookResponse.ok) {
-        throw new Error('Erro ao comunicar com o webhook');
+        const errorText = await webhookResponse.text();
+        console.error('Erro do webhook:', errorText);
+        throw new Error(`Erro ${webhookResponse.status}: ${errorText}`);
       }
 
       const webhookData = await webhookResponse.json();
+      console.log('Resposta do webhook:', webhookData);
       
-      if (webhookData.qrCode) {
-        setQrCode(webhookData.qrCode);
+      if (webhookData.qrCode || webhookData.qrcode) {
+        const qrCodeData = webhookData.qrCode || webhookData.qrcode;
+        setQrCode(qrCodeData);
         
         // Salvar instância no banco de dados
-        const { error } = await supabase
-          .from('whatsapp_instances' as any)
-          .insert({
-            user_id: user.id,
-            instance_id: instanceName.trim(),
-            status: 'pending',
-            qr_code: webhookData.qrCode
-          });
+        try {
+          const { error: dbError } = await supabase
+            .from('whatsapp_instances' as any)
+            .insert({
+              user_id: user.id,
+              instance_id: instanceName.trim(),
+              status: 'pending',
+              qr_code: qrCodeData
+            });
 
-        if (error) {
-          console.error('Erro ao salvar instância:', error);
+          if (dbError) {
+            console.error('Erro ao salvar no banco:', dbError);
+          }
+        } catch (dbErr) {
+          console.error('Erro na operação do banco:', dbErr);
         }
 
         toast({
@@ -78,12 +87,14 @@ const QRCodeManager = () => {
           description: "QR Code gerado! Escaneie com seu WhatsApp.",
         });
       } else {
+        console.error('QR Code não encontrado na resposta:', webhookData);
         throw new Error('QR Code não retornado pelo webhook');
       }
     } catch (err: any) {
+      console.error('Erro completo:', err);
       toast({
         title: "Erro",
-        description: "Erro ao gerar QR Code: " + String(err.message || err),
+        description: `Erro ao gerar QR Code: ${err.message || 'Erro desconhecido'}`,
         variant: "destructive",
       });
     } finally {
