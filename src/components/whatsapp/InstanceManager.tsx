@@ -44,7 +44,7 @@ const InstanceManager = ({ onInstanceSelect }: InstanceManagerProps) => {
 
     try {
       const { data, error } = await supabase
-        .from('whatsapp_instances')
+        .from('whatsapp_instances' as any)
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
@@ -52,7 +52,7 @@ const InstanceManager = ({ onInstanceSelect }: InstanceManagerProps) => {
       if (error) {
         console.error('Erro ao carregar instâncias:', error);
       } else {
-        setInstances(data || []);
+        setInstances((data as WhatsAppInstance[]) || []);
       }
     } catch (err) {
       console.error('Erro inesperado:', err);
