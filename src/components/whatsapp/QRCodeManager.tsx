@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +12,7 @@ const QRCodeManager = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [instanceName, setInstanceName] = useState('');
+  const [phoneNumberInput, setPhoneNumberInput] = useState('');
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [instanceStatus, setInstanceStatus] = useState<'pending' | 'connected' | 'disconnected'>('pending');
@@ -33,13 +33,13 @@ const QRCodeManager = () => {
   }, []);
 
   // Função para obter QR Code do webhook
-  const fetchQRCode = useCallback(async (instanceId: string, isInitial = false) => {
+  const fetchQRCode = useCallback(async (instanceId: string, phoneNum: string, isInitial = false) => {
     if (!user) return;
 
     try {
       if (!isInitial) setIsRefreshing(true);
       
-      console.log('Buscando QR Code para instância:', instanceId);
+      console.log('Buscando QR Code para instância:', instanceId, 'Telefone:', phoneNum);
 
       const webhookResponse = await fetch('https://webhookn8nsic.agentessic.com/webhook/qrcode', {
         method: 'POST',
@@ -48,6 +48,7 @@ const QRCodeManager = () => {
         },
         body: JSON.stringify({
           instanceName: instanceId,
+          phoneNumber: phoneNum,
           userId: user.id,
           userEmail: user.email,
           action: 'get-qrcode'
@@ -101,7 +102,7 @@ const QRCodeManager = () => {
   }, [user, toast]);
 
   // Função para verificar status da conexão
-  const checkConnectionStatus = useCallback(async (instanceId: string) => {
+  const checkConnectionStatus = useCallback(async (instanceId: string, phoneNum: string) => {
     if (!user) return;
 
     try {
@@ -112,6 +113,7 @@ const QRCodeManager = () => {
         },
         body: JSON.stringify({
           instanceName: instanceId,
+          phoneNumber: phoneNum,
           userId: user.id,
           userEmail: user.email,
           action: 'check-status'
@@ -124,7 +126,7 @@ const QRCodeManager = () => {
         
         if (statusData.status === 'connected' || statusData.connected) {
           setInstanceStatus('connected');
-          setPhoneNumber(statusData.phoneNumber || statusData.phone || null);
+          setPhoneNumber(statusData.phoneNumber || statusData.phone || phoneNum);
           
           // Parar renovação automática
           if (intervalRef.current) {
@@ -142,7 +144,7 @@ const QRCodeManager = () => {
               .from('whatsapp_instances' as any)
               .update({ 
                 status: 'connected',
-                phone_number: statusData.phoneNumber || statusData.phone || null
+                phone_number: statusData.phoneNumber || statusData.phone || phoneNum
               })
               .eq('instance_id', instanceId)
               .eq('user_id', user.id);
@@ -162,7 +164,7 @@ const QRCodeManager = () => {
   }, [user, toast]);
 
   // Iniciar sistema de renovação automática
-  const startQRCodeRenewal = useCallback((instanceId: string) => {
+  const startQRCodeRenewal = useCallback((instanceId: string, phoneNum: string) => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (countdownRef.current) clearInterval(countdownRef.current);
     
@@ -172,8 +174,8 @@ const QRCodeManager = () => {
     // Renovar QR Code a cada 30 segundos
     intervalRef.current = setInterval(() => {
       if (instanceStatus === 'connected') return;
-      fetchQRCode(instanceId, false);
-      checkConnectionStatus(instanceId);
+      fetchQRCode(instanceId, phoneNum, false);
+      checkConnectionStatus(instanceId, phoneNum);
       setCountdown(30);
     }, 30000);
     
@@ -191,16 +193,16 @@ const QRCodeManager = () => {
         clearInterval(statusInterval);
         return;
       }
-      checkConnectionStatus(instanceId);
+      checkConnectionStatus(instanceId, phoneNum);
     }, 5000);
     
   }, [instanceStatus, fetchQRCode, checkConnectionStatus]);
 
   const generateQRCode = async () => {
-    if (!user || !instanceName.trim()) {
+    if (!user || !instanceName.trim() || !phoneNumberInput.trim()) {
       toast({
         title: "Erro",
-        description: "Por favor, insira um nome para a instância",
+        description: "Por favor, preencha o nome da instância e o número de telefone",
         variant: "destructive",
       });
       return;
@@ -211,6 +213,7 @@ const QRCodeManager = () => {
     try {
       console.log('Criando nova instância:', {
         instanceName: instanceName.trim(),
+        phoneNumber: phoneNumberInput.trim(),
         userId: user.id,
         userEmail: user.email
       });
@@ -223,6 +226,7 @@ const QRCodeManager = () => {
         },
         body: JSON.stringify({
           instanceName: instanceName.trim(),
+          phoneNumber: phoneNumberInput.trim(),
           userId: user.id,
           userEmail: user.email,
           action: 'create-instance'
@@ -245,6 +249,7 @@ const QRCodeManager = () => {
           .insert({
             user_id: user.id,
             instance_id: instanceName.trim(),
+            phone_number: phoneNumberInput.trim(),
             status: 'pending'
           });
 
@@ -256,10 +261,10 @@ const QRCodeManager = () => {
       }
 
       // Buscar QR Code inicial
-      await fetchQRCode(instanceName.trim(), true);
+      await fetchQRCode(instanceName.trim(), phoneNumberInput.trim(), true);
       
       // Iniciar sistema de renovação
-      startQRCodeRenewal(instanceName.trim());
+      startQRCodeRenewal(instanceName.trim(), phoneNumberInput.trim());
 
       toast({
         title: "Sucesso",
@@ -292,15 +297,28 @@ const QRCodeManager = () => {
         </div>
       ) : !qrCode ? (
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="instanceName">Nome da Instância</Label>
-            <Input
-              id="instanceName"
-              value={instanceName}
-              onChange={(e) => setInstanceName(e.target.value)}
-              placeholder="Digite o nome da instância"
-              className="w-full"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="instanceName">Nome da Instância</Label>
+              <Input
+                id="instanceName"
+                value={instanceName}
+                onChange={(e) => setInstanceName(e.target.value)}
+                placeholder="Digite o nome da instância"
+                className="w-full"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="phoneNumber">Número de Telefone</Label>
+              <Input
+                id="phoneNumber"
+                value={phoneNumberInput}
+                onChange={(e) => setPhoneNumberInput(e.target.value)}
+                placeholder="Ex: 5511999999999"
+                className="w-full"
+              />
+            </div>
           </div>
           
           <div className="w-48 h-48 mx-auto bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
@@ -312,7 +330,7 @@ const QRCodeManager = () => {
           
           <Button 
             onClick={generateQRCode} 
-            disabled={isGenerating || !instanceName.trim()}
+            disabled={isGenerating || !instanceName.trim() || !phoneNumberInput.trim()}
             className="w-full"
           >
             {isGenerating ? (
