@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +32,70 @@ const QRCodeManager = () => {
     };
   }, []);
 
+  // Função para processar base64 e garantir que seja uma imagem válida
+  const processBase64QRCode = (base64Data: string): string | null => {
+    try {
+      console.log('Processando base64 QR Code:', base64Data.substring(0, 100) + '...');
+      
+      let processedBase64 = base64Data;
+      
+      // Remover possíveis prefixos existentes
+      if (processedBase64.startsWith('data:image/')) {
+        processedBase64 = processedBase64.split(',')[1];
+      }
+      
+      // Verificar se é um base64 válido
+      if (!processedBase64 || processedBase64.length < 100) {
+        console.error('Base64 muito curto ou inválido:', processedBase64.length);
+        return null;
+      }
+      
+      // Adicionar prefixo correto para imagem
+      const finalBase64 = `data:image/png;base64,${processedBase64}`;
+      console.log('Base64 processado com sucesso');
+      
+      return finalBase64;
+    } catch (error) {
+      console.error('Erro ao processar base64:', error);
+      return null;
+    }
+  };
+
+  // Função para extrair QR Code da resposta do webhook
+  const extractQRCodeFromResponse = (data: any): string | null => {
+    console.log('Resposta completa do webhook:', JSON.stringify(data, null, 2));
+    
+    // Possíveis campos onde o QR Code pode estar
+    const possibleFields = [
+      'qrCode', 'qrcode', 'codigo_qr', 'qr_code', 'base64', 
+      'qr', 'code', 'qrCodeBase64', 'qrcodeBase64'
+    ];
+    
+    for (const field of possibleFields) {
+      if (data[field]) {
+        console.log(`QR Code encontrado no campo: ${field}`);
+        const processedQR = processBase64QRCode(data[field]);
+        if (processedQR) {
+          return processedQR;
+        }
+      }
+    }
+    
+    // Verificar em objetos aninhados
+    if (data.data && typeof data.data === 'object') {
+      console.log('Verificando objeto data aninhado');
+      return extractQRCodeFromResponse(data.data);
+    }
+    
+    if (data.result && typeof data.result === 'object') {
+      console.log('Verificando objeto result aninhado');
+      return extractQRCodeFromResponse(data.result);
+    }
+    
+    console.error('QR Code não encontrado em nenhum campo conhecido');
+    return null;
+  };
+
   // Função para obter QR Code do webhook
   const fetchQRCode = useCallback(async (instanceId: string, phoneNum: string, isInitial = false) => {
     if (!user) return;
@@ -40,7 +103,10 @@ const QRCodeManager = () => {
     try {
       if (!isInitial) setIsRefreshing(true);
       
-      console.log('Buscando QR Code para instância:', instanceId, 'Telefone:', phoneNum);
+      console.log('=== BUSCANDO QR CODE ===');
+      console.log('Instância:', instanceId);
+      console.log('Telefone:', phoneNum);
+      console.log('Is Initial:', isInitial);
 
       const webhookResponse = await fetch('https://n8nsic.agentessic.com/webhook-test/qrcode', {
         method: 'POST',
@@ -56,40 +122,56 @@ const QRCodeManager = () => {
         })
       });
 
+      console.log('Status da resposta:', webhookResponse.status);
+      console.log('Headers da resposta:', Object.fromEntries(webhookResponse.headers.entries()));
+
       if (!webhookResponse.ok) {
         const errorText = await webhookResponse.text();
-        console.error('Erro do webhook:', errorText);
+        console.error('Erro HTTP do webhook:', errorText);
         throw new Error(`Erro ${webhookResponse.status}: ${errorText}`);
       }
 
       const webhookData = await webhookResponse.json();
-      console.log('Resposta do webhook:', webhookData);
+      console.log('=== DADOS DO WEBHOOK ===');
+      console.log(JSON.stringify(webhookData, null, 2));
       
-      if (webhookData.qrCode || webhookData.qrcode) {
-        const qrCodeData = webhookData.qrCode || webhookData.qrcode;
-        setQrCode(qrCodeData);
+      const extractedQRCode = extractQRCodeFromResponse(webhookData);
+      
+      if (extractedQRCode) {
+        console.log('✅ QR Code extraído com sucesso');
+        setQrCode(extractedQRCode);
         
         // Atualizar no banco apenas se for inicial
         if (isInitial) {
           try {
-            await supabase
+            const { error: dbError } = await supabase
               .from('whatsapp_instances' as any)
-              .update({ qr_code: qrCodeData })
+              .update({ qr_code: extractedQRCode })
               .eq('instance_id', instanceId)
               .eq('user_id', user.id);
+              
+            if (dbError) {
+              console.error('Erro ao atualizar QR Code no banco:', dbError);
+            } else {
+              console.log('QR Code salvo no banco com sucesso');
+            }
           } catch (dbErr) {
-            console.error('Erro ao atualizar QR Code no banco:', dbErr);
+            console.error('Erro na operação do banco:', dbErr);
           }
         }
         
         if (!isInitial) {
-          console.log('QR Code renovado com sucesso');
+          console.log('🔄 QR Code renovado com sucesso');
         }
       } else {
-        throw new Error('QR Code não encontrado na resposta');
+        console.error('❌ QR Code não pôde ser extraído da resposta');
+        throw new Error('QR Code não encontrado ou inválido na resposta do webhook');
       }
     } catch (err: any) {
-      console.error('Erro ao buscar QR Code:', err);
+      console.error('=== ERRO AO BUSCAR QR CODE ===');
+      console.error('Erro completo:', err);
+      console.error('Stack trace:', err.stack);
+      
       if (isInitial) {
         toast({
           title: "Erro",
@@ -107,6 +189,10 @@ const QRCodeManager = () => {
     if (!user) return;
 
     try {
+      console.log('=== VERIFICANDO STATUS DA CONEXÃO ===');
+      console.log('Instância:', instanceId);
+      console.log('Telefone:', phoneNum);
+
       const webhookResponse = await fetch('https://n8nsic.agentessic.com/webhook-test/qrcode', {
         method: 'POST',
         headers: {
@@ -123,16 +209,35 @@ const QRCodeManager = () => {
 
       if (webhookResponse.ok) {
         const statusData = await webhookResponse.json();
-        console.log('Status da instância:', statusData);
+        console.log('=== STATUS DA INSTÂNCIA ===');
+        console.log(JSON.stringify(statusData, null, 2));
         
-        if (statusData.status === 'connected' || statusData.connected) {
+        // Verificar diferentes campos de status
+        const isConnected = statusData.status === 'connected' || 
+                           statusData.connected === true ||
+                           statusData.state === 'connected' ||
+                           statusData.connectionState === 'open' ||
+                           (statusData.data && statusData.data.connected);
+        
+        if (isConnected) {
+          console.log('🟢 WHATSAPP CONECTADO!');
           setInstanceStatus('connected');
-          setPhoneNumber(statusData.phoneNumber || statusData.phone || phoneNum);
+          
+          // Extrair número de telefone de diferentes campos possíveis
+          const detectedPhone = statusData.phoneNumber || 
+                               statusData.phone || 
+                               statusData.number ||
+                               statusData.wuid ||
+                               (statusData.data && statusData.data.phoneNumber) ||
+                               phoneNum;
+          
+          setPhoneNumber(detectedPhone);
           
           // Parar renovação automática
           if (intervalRef.current) {
             clearInterval(intervalRef.current);
             intervalRef.current = null;
+            console.log('🛑 Renovação automática parada');
           }
           if (countdownRef.current) {
             clearInterval(countdownRef.current);
@@ -141,26 +246,37 @@ const QRCodeManager = () => {
           
           // Atualizar no banco
           try {
-            await supabase
+            const { error: dbError } = await supabase
               .from('whatsapp_instances' as any)
               .update({ 
                 status: 'connected',
-                phone_number: statusData.phoneNumber || statusData.phone || phoneNum
+                phone_number: detectedPhone
               })
               .eq('instance_id', instanceId)
               .eq('user_id', user.id);
+              
+            if (dbError) {
+              console.error('Erro ao atualizar status no banco:', dbError);
+            } else {
+              console.log('✅ Status atualizado no banco');
+            }
           } catch (dbErr) {
-            console.error('Erro ao atualizar status no banco:', dbErr);
+            console.error('Erro na operação do banco:', dbErr);
           }
 
           toast({
             title: "Sucesso!",
-            description: "WhatsApp conectado com sucesso!",
+            description: `WhatsApp conectado com sucesso! Número: ${detectedPhone}`,
           });
+        } else {
+          console.log('🟡 Ainda aguardando conexão...');
         }
+      } else {
+        console.log('❌ Erro ao verificar status:', webhookResponse.status);
       }
     } catch (err) {
-      console.error('Erro ao verificar status:', err);
+      console.error('=== ERRO AO VERIFICAR STATUS ===');
+      console.error('Erro:', err);
     }
   }, [user, toast]);
 
@@ -212,12 +328,11 @@ const QRCodeManager = () => {
     setIsGenerating(true);
     
     try {
-      console.log('Criando nova instância:', {
-        instanceName: instanceName.trim(),
-        phoneNumber: phoneNumberInput.trim(),
-        userId: user.id,
-        userEmail: user.email
-      });
+      console.log('=== CRIANDO NOVA INSTÂNCIA ===');
+      console.log('Nome da instância:', instanceName.trim());
+      console.log('Número de telefone:', phoneNumberInput.trim());
+      console.log('User ID:', user.id);
+      console.log('User email:', user.email);
 
       // Criar instância via webhook
       const webhookResponse = await fetch('https://n8nsic.agentessic.com/webhook-test/qrcode', {
@@ -234,14 +349,17 @@ const QRCodeManager = () => {
         })
       });
 
+      console.log('Status da criação:', webhookResponse.status);
+
       if (!webhookResponse.ok) {
         const errorText = await webhookResponse.text();
-        console.error('Erro do webhook:', errorText);
+        console.error('Erro HTTP na criação:', errorText);
         throw new Error(`Erro ${webhookResponse.status}: ${errorText}`);
       }
 
       const webhookData = await webhookResponse.json();
-      console.log('Instância criada:', webhookData);
+      console.log('=== INSTÂNCIA CRIADA ===');
+      console.log(JSON.stringify(webhookData, null, 2));
       
       // Salvar instância no banco
       try {
@@ -256,6 +374,8 @@ const QRCodeManager = () => {
 
         if (dbError) {
           console.error('Erro ao salvar no banco:', dbError);
+        } else {
+          console.log('✅ Instância salva no banco');
         }
       } catch (dbErr) {
         console.error('Erro na operação do banco:', dbErr);
@@ -273,7 +393,10 @@ const QRCodeManager = () => {
       });
       
     } catch (err: any) {
-      console.error('Erro completo:', err);
+      console.error('=== ERRO COMPLETO ===');
+      console.error('Erro:', err);
+      console.error('Stack:', err.stack);
+      
       toast({
         title: "Erro",
         description: `Erro ao criar instância: ${err.message || 'Erro desconhecido'}`,
