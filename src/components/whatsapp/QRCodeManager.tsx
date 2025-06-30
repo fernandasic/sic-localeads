@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,7 +42,7 @@ const QRCodeManager = () => {
       
       console.log('Buscando QR Code para instância:', instanceId, 'Telefone:', phoneNum);
 
-      const webhookResponse = await fetch('https://webhookn8nsic.agentessic.com/webhook/qrcode', {
+      const webhookResponse = await fetch('https://n8nsic.agentessic.com/webhook-test/qrcode', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -106,7 +107,7 @@ const QRCodeManager = () => {
     if (!user) return;
 
     try {
-      const webhookResponse = await fetch('https://webhookn8nsic.agentessic.com/webhook/qrcode', {
+      const webhookResponse = await fetch('https://n8nsic.agentessic.com/webhook-test/qrcode', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -219,7 +220,7 @@ const QRCodeManager = () => {
       });
 
       // Criar instância via webhook
-      const webhookResponse = await fetch('https://webhookn8nsic.agentessic.com/webhook/qrcode', {
+      const webhookResponse = await fetch('https://n8nsic.agentessic.com/webhook-test/qrcode', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
