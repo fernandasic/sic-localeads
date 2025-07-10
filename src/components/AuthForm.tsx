@@ -23,22 +23,48 @@ const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!email || !password) {
+      setError('Por favor, preencha todos os campos');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
+      console.log('Tentando login com:', { email: email.trim() });
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
         password,
       });
 
+      console.log('Resposta do login:', { data, error });
+
       if (error) {
-        setError(error.message);
-      } else {
+        console.error('Erro no login:', error);
+        let errorMessage = 'Erro ao fazer login';
+        
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = 'Email ou senha incorretos';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = 'Por favor, confirme seu email antes de fazer login';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = 'Erro de conexão. Verifique sua internet e tente novamente';
+        }
+        
+        setError(errorMessage);
+        return;
+      }
+
+      if (data.user) {
+        console.log('Login bem-sucedido:', data.user);
         onAuthSuccess();
       }
     } catch (err) {
-      setError('Erro inesperado ao fazer login');
+      console.error('Erro inesperado no login:', err);
+      setError('Erro de conexão. Verifique sua internet e tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -46,30 +72,71 @@ const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!email || !password || !fullName) {
+      setError('Por favor, preencha todos os campos');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('A senha deve ter pelo menos 6 caracteres');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
-      const redirectUrl = `${window.location.origin}/`;
+      console.log('Tentando cadastro com:', { 
+        email: email.trim(), 
+        fullName: fullName.trim() 
+      });
       
-      const { error } = await supabase.auth.signUp({
-        email,
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
         password,
         options: {
-          emailRedirectTo: redirectUrl,
           data: {
-            full_name: fullName,
+            full_name: fullName.trim(),
           }
         }
       });
 
+      console.log('Resposta do cadastro:', { data, error });
+
       if (error) {
-        setError(error.message);
-      } else {
-        setError('Verifique seu email para confirmar o cadastro');
+        console.error('Erro no cadastro:', error);
+        let errorMessage = 'Erro ao criar conta';
+        
+        if (error.message.includes('already registered')) {
+          errorMessage = 'Este email já está cadastrado';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = 'Erro de conexão. Verifique sua internet e tente novamente';
+        } else if (error.message.includes('weak password')) {
+          errorMessage = 'Senha muito fraca. Use pelo menos 6 caracteres';
+        }
+        
+        setError(errorMessage);
+        return;
+      }
+
+      if (data.user) {
+        console.log('Cadastro bem-sucedido:', data.user);
+        setEmail('');
+        setPassword('');
+        setFullName('');
+        
+        // Se o usuário foi criado mas precisa confirmar email
+        if (!data.session) {
+          setError('Conta criada com sucesso! Verifique seu email para confirmar a conta.');
+        } else {
+          // Se o login automático funcionou
+          onAuthSuccess();
+        }
       }
     } catch (err) {
-      setError('Erro inesperado ao fazer cadastro');
+      console.error('Erro inesperado no cadastro:', err);
+      setError('Erro de conexão. Verifique sua internet e tente novamente.');
     } finally {
       setIsLoading(false);
     }
