@@ -192,6 +192,75 @@ serve(async (req) => {
         }
       }
 
+      case 'validate-instance': {
+        const { instanceName } = body
+        
+        try {
+          const baseUrl = URL_EVOLUTION || EVOLUTION_API_SERVER_URL
+          const apiKey = APIKEY_GLOBAL || EVOLUTION_API_KEY
+          
+          // Buscar informações da instância
+          const response = await fetch(`${baseUrl}/instance/fetchInstances`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': apiKey
+            }
+          })
+          
+          if (!response.ok) {
+            throw new Error('Erro ao buscar instâncias')
+          }
+
+          const instances = await response.json()
+          
+          // Procurar a instância pelo nome
+          const instance = Array.isArray(instances) 
+            ? instances.find((i: any) => i.instance?.instanceName === instanceName)
+            : null
+          
+          if (!instance) {
+            return new Response(
+              JSON.stringify({ 
+                valid: false, 
+                message: 'Instância não encontrada'
+              }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+          
+          // Verificar se está conectada (status "open")
+          if (instance.instance?.state !== 'open') {
+            return new Response(
+              JSON.stringify({ 
+                valid: false, 
+                message: 'Instância não está conectada'
+              }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+          
+          return new Response(
+            JSON.stringify({ 
+              valid: true, 
+              message: 'Instância ativa e pronta para uso',
+              instance: instance
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+          
+        } catch (error) {
+          console.error('Erro ao validar instância:', error)
+          return new Response(
+            JSON.stringify({ 
+              valid: false, 
+              message: 'Erro ao verificar instância'
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+      }
+
       case 'send-message': {
         const { instanceId, number, message, messageType } = body
         

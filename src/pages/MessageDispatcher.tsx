@@ -28,8 +28,9 @@ interface Message {
 export default function MessageDispatcher() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const [instances, setInstances] = useState<WhatsAppInstance[]>([]);
-  const [selectedInstances, setSelectedInstances] = useState<string[]>([]);
+  const [instanceName, setInstanceName] = useState("");
+  const [instanceStatus, setInstanceStatus] = useState<'idle' | 'checking' | 'active' | 'refused'>('idle');
+  const [instanceMessage, setInstanceMessage] = useState("");
   const [phoneNumbers, setPhoneNumbers] = useState("");
   const [minDelay, setMinDelay] = useState("2");
   const [maxDelay, setMaxDelay] = useState("5");
@@ -47,34 +48,44 @@ export default function MessageDispatcher() {
   }, [user, loading, navigate]);
 
   useEffect(() => {
-    if (user) {
-      loadInstances();
-    }
-  }, [user]);
-
-  useEffect(() => {
     const newMessages = Array.from({ length: messageCount }, (_, i) => 
       messages[i] || { type: "texto" as const, content: "" }
     );
     setMessages(newMessages);
   }, [messageCount]);
 
-  const loadInstances = async () => {
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from("whatsapp_instances")
-      .select("*")
-      .eq("user_id", user.id);
-
-    if (error) {
-      toast.error("Erro ao carregar instâncias");
+  const validateInstance = async () => {
+    if (!instanceName.trim()) {
+      setInstanceStatus('idle');
+      setInstanceMessage("");
       return;
     }
 
-    // Filter only connected instances
-    const connected = (data || []).filter(inst => inst.status === "connected");
-    setInstances(connected);
+    setInstanceStatus('checking');
+    setInstanceMessage("Verificando instância...");
+
+    try {
+      const { data, error } = await supabase.functions.invoke("whatsapp-manager", {
+        body: {
+          action: "validate-instance",
+          instanceName: instanceName.trim()
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.valid) {
+        setInstanceStatus('active');
+        setInstanceMessage("Instância ativa");
+      } else {
+        setInstanceStatus('refused');
+        setInstanceMessage(data.message || "Instância recusada");
+      }
+    } catch (error: any) {
+      setInstanceStatus('refused');
+      setInstanceMessage("Erro ao verificar instância");
+      console.error(error);
+    }
   };
 
   const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -112,16 +123,16 @@ export default function MessageDispatcher() {
     return (Math.floor(Math.random() * (max - min + 1)) + min) * 1000;
   };
 
-  const getRandomInstance = () => {
-    const index = Math.floor(Math.random() * selectedInstances.length);
-    return selectedInstances[index];
-  };
-
   const handleDispatch = async () => {
     const numbers = phoneNumbers.trim().split("\n").filter((n) => n);
     
-    if (!numbers.length || !minDelay || !maxDelay || !selectedInstances.length) {
-      toast.error("Preencha todos os campos e selecione pelo menos uma instância");
+    if (!numbers.length || !minDelay || !maxDelay) {
+      toast.error("Preencha todos os campos");
+      return;
+    }
+
+    if (instanceStatus !== 'active') {
+      toast.error("Por favor, insira uma instância ativa antes de disparar");
       return;
     }
 
@@ -131,8 +142,6 @@ export default function MessageDispatcher() {
     const logs: string[] = [];
 
     for (let i = 0; i < total; i++) {
-      const instanceId = getRandomInstance();
-
       for (const msg of messages) {
         if (!msg.content.trim()) continue;
 
@@ -140,7 +149,7 @@ export default function MessageDispatcher() {
           const { data, error } = await supabase.functions.invoke("whatsapp-manager", {
             body: {
               action: "send-message",
-              instanceId,
+              instanceId: instanceName,
               number: numbers[i],
               message: msg.content,
               messageType: msg.type,
@@ -149,9 +158,9 @@ export default function MessageDispatcher() {
 
           if (error) throw error;
 
-          logs.push(`✅ ${numbers[i]} via ${instanceId} - ${msg.type}: OK`);
+          logs.push(`✅ ${numbers[i]} via ${instanceName} - ${msg.type}: OK`);
         } catch (error: any) {
-          logs.push(`❌ ${numbers[i]} via ${instanceId} - Erro: ${error.message}`);
+          logs.push(`❌ ${numbers[i]} via ${instanceName} - Erro: ${error.message}`);
         }
       }
 
@@ -178,13 +187,6 @@ export default function MessageDispatcher() {
     URL.revokeObjectURL(url);
   };
 
-  const toggleInstance = (instanceId: string) => {
-    setSelectedInstances((prev) =>
-      prev.includes(instanceId)
-        ? prev.filter((id) => id !== instanceId)
-        : [...prev, instanceId]
-    );
-  };
 
   if (loading) {
     return <div className="min-h-screen bg-background flex items-center justify-center">Carregando...</div>;
@@ -205,20 +207,24 @@ export default function MessageDispatcher() {
 
           <div className="space-y-6">
             <div>
-              <Label>Selecione as Instâncias (será aleatório por número)</Label>
-              <div className="border rounded-lg p-4 mt-2 space-y-2 max-h-48 overflow-y-auto">
-                {instances.map((inst) => (
-                  <div key={inst.id} className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={selectedInstances.includes(inst.id)}
-                      onChange={() => toggleInstance(inst.id)}
-                      className="rounded"
-                    />
-                    <span>{inst.instance_name} {inst.phone_number && `(${inst.phone_number})`}</span>
-                  </div>
-                ))}
-              </div>
+              <Label htmlFor="instanceName">Nome da Instância</Label>
+              <Input
+                id="instanceName"
+                value={instanceName}
+                onChange={(e) => setInstanceName(e.target.value)}
+                onBlur={validateInstance}
+                placeholder="Digite o nome da instância"
+                className="mt-2"
+              />
+              {instanceStatus === 'checking' && (
+                <p className="text-blue-500 mt-2 text-sm">🔍 Verificando instância...</p>
+              )}
+              {instanceStatus === 'active' && (
+                <p className="text-green-500 mt-2 text-sm font-semibold">✅ Instância ativa</p>
+              )}
+              {instanceStatus === 'refused' && (
+                <p className="text-red-500 mt-2 text-sm font-semibold">❌ {instanceMessage}</p>
+              )}
             </div>
 
             <div>
