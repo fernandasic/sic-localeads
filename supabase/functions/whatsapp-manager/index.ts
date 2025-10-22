@@ -199,6 +199,9 @@ serve(async (req) => {
           const baseUrl = URL_EVOLUTION || EVOLUTION_API_SERVER_URL
           const apiKey = APIKEY_GLOBAL || EVOLUTION_API_KEY
           
+          console.log('🔍 Validando instância:', instanceName)
+          console.log('📍 URL base:', baseUrl)
+          
           // Buscar informações da instância
           const response = await fetch(`${baseUrl}/instance/fetchInstances`, {
             method: 'GET',
@@ -209,15 +212,36 @@ serve(async (req) => {
           })
           
           if (!response.ok) {
+            console.error('❌ Erro na resposta da API:', response.status, response.statusText)
             throw new Error('Erro ao buscar instâncias')
           }
 
           const instances = await response.json()
+          console.log('📋 Instâncias retornadas:', JSON.stringify(instances, null, 2))
           
-          // Procurar a instância pelo nome
-          const instance = Array.isArray(instances) 
-            ? instances.find((i: any) => i.instance?.instanceName === instanceName)
-            : null
+          // Procurar a instância pelo nome - testar múltiplas estruturas possíveis
+          let instance = null
+          
+          if (Array.isArray(instances)) {
+            console.log('✅ Resposta é um array com', instances.length, 'instâncias')
+            
+            // Tentar diferentes estruturas de resposta
+            instance = instances.find((i: any) => {
+              const possibleNames = [
+                i.instance?.instanceName,
+                i.instanceName,
+                i.name,
+                i.instance?.name
+              ]
+              
+              console.log('🔎 Comparando com:', possibleNames)
+              return possibleNames.includes(instanceName)
+            })
+          } else {
+            console.log('⚠️ Resposta não é um array:', typeof instances)
+          }
+          
+          console.log('🎯 Instância encontrada:', instance ? 'SIM' : 'NÃO')
           
           if (!instance) {
             return new Response(
@@ -230,7 +254,10 @@ serve(async (req) => {
           }
           
           // Verificar se está conectada (status "open")
-          if (instance.instance?.state !== 'open') {
+          const state = instance.instance?.state || instance.state || instance.connectionStatus
+          console.log('📊 Estado da instância:', state)
+          
+          if (state !== 'open') {
             return new Response(
               JSON.stringify({ 
                 valid: false, 
@@ -250,11 +277,12 @@ serve(async (req) => {
           )
           
         } catch (error) {
-          console.error('Erro ao validar instância:', error)
+          console.error('❌ Erro ao validar instância:', error)
           return new Response(
             JSON.stringify({ 
               valid: false, 
-              message: 'Erro ao verificar instância'
+              message: 'Erro ao verificar instância',
+              error: error.message
             }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
