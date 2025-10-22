@@ -44,6 +44,8 @@ export default function MessageDispatcher() {
   const [statusText, setStatusText] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [listName, setListName] = useState("");
+  const [savedLists, setSavedLists] = useState<Array<{id: string, name: string, companies: any[]}>>([]);
+  const [selectedListId, setSelectedListId] = useState<string>("");
 
   useEffect(() => {
     if (!loading && !user) {
@@ -57,6 +59,33 @@ export default function MessageDispatcher() {
     );
     setMessages(newMessages);
   }, [messageCount]);
+
+  useEffect(() => {
+    if (user) {
+      loadSavedLists();
+    }
+  }, [user]);
+
+  const loadSavedLists = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("saved_lists")
+        .select("id, name, companies")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      setSavedLists((data || []).map(item => ({
+        id: item.id,
+        name: item.name,
+        companies: Array.isArray(item.companies) ? item.companies : []
+      })));
+    } catch (error: any) {
+      console.error("Erro ao carregar listas:", error);
+    }
+  };
 
   const validateInstance = async () => {
     if (!instanceName.trim()) {
@@ -117,6 +146,18 @@ export default function MessageDispatcher() {
     reader.readAsText(file);
   };
 
+  const handleLoadListFromSelect = (listId: string) => {
+    setSelectedListId(listId);
+    
+    const selectedList = savedLists.find(list => list.id === listId);
+    if (!selectedList) return;
+    
+    const phones = selectedList.companies.map((company: any) => company.phone || "").filter(Boolean);
+    setPhoneNumbers(phones.join("\n"));
+    
+    toast.success(`Lista "${selectedList.name}" carregada com ${phones.length} números`);
+  };
+
   const updateMessage = (index: number, field: "type" | "content", value: string) => {
     const newMessages = [...messages];
     newMessages[index] = { ...newMessages[index], [field]: value };
@@ -158,6 +199,7 @@ export default function MessageDispatcher() {
       toast.success("Lista salva com sucesso!");
       setIsDialogOpen(false);
       setListName("");
+      loadSavedLists();
     } catch (error: any) {
       console.error("Erro ao salvar lista:", error);
       toast.error("Erro ao salvar lista: " + error.message);
@@ -266,6 +308,28 @@ export default function MessageDispatcher() {
               {instanceStatus === 'refused' && (
                 <p className="text-red-500 mt-2 text-sm font-semibold">❌ {instanceMessage}</p>
               )}
+            </div>
+
+            <div>
+              <Label htmlFor="selectList">Carregar Lista Salva</Label>
+              <Select value={selectedListId} onValueChange={handleLoadListFromSelect}>
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder="Selecione uma lista salva" />
+                </SelectTrigger>
+                <SelectContent className="bg-background z-50">
+                  {savedLists.length === 0 ? (
+                    <SelectItem value="empty" disabled>
+                      Nenhuma lista salva
+                    </SelectItem>
+                  ) : (
+                    savedLists.map((list) => (
+                      <SelectItem key={list.id} value={list.id}>
+                        {list.name} ({list.companies?.length || 0} contatos)
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
