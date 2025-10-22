@@ -7,6 +7,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const URL_EVOLUTION = Deno.env.get('URL_EVOLUTION')!
+const APIKEY_GLOBAL = Deno.env.get('APIKEY_GLOBAL')!
+
 // Configurações da EvolutionAPI
 const EVOLUTION_API_SERVER_URL = Deno.env.get('EVOLUTION_API_SERVER_URL') || 'https://evosic.agentessic.com'
 const EVOLUTION_API_KEY = Deno.env.get('EVOLUTION_API_KEY') || '67dd855b923b57335bada6b4a0582576'
@@ -190,33 +193,55 @@ serve(async (req) => {
       }
 
       case 'send-message': {
-        const { instanceId, phoneNumber, message, mediaUrl } = body
+        const { instanceId, number, message, messageType } = body
         
         try {
-          const payload: any = {
-            number: phoneNumber,
-            textMessage: {
-              text: message
-            }
+          let endpoint = ''
+          let payload: any = {
+            number: number
           }
 
-          if (mediaUrl) {
-            payload.mediaMessage = {
-              mediatype: 'image',
-              media: mediaUrl
-            }
+          // Usar URL_EVOLUTION se disponível, senão usar EVOLUTION_API_SERVER_URL
+          const baseUrl = URL_EVOLUTION || EVOLUTION_API_SERVER_URL
+          const apiKey = APIKEY_GLOBAL || EVOLUTION_API_KEY
+
+          switch (messageType) {
+            case 'texto':
+              endpoint = `${baseUrl}/message/sendText/${instanceId}`
+              payload.text = message
+              break
+            case 'imagem':
+              endpoint = `${baseUrl}/message/sendMedia/${instanceId}`
+              payload.mediaUrl = message
+              payload.mediaType = 'image'
+              break
+            case 'audio':
+              endpoint = `${baseUrl}/message/sendMedia/${instanceId}`
+              payload.mediaUrl = message
+              payload.mediaType = 'audio'
+              break
+            case 'video':
+              endpoint = `${baseUrl}/message/sendMedia/${instanceId}`
+              payload.mediaUrl = message
+              payload.mediaType = 'video'
+              break
+            default:
+              throw new Error('Tipo de mensagem inválido')
           }
 
-          const sendResponse = await fetch(`${EVOLUTION_API_SERVER_URL}/message/sendText/${instanceId}`, {
+          const sendResponse = await fetch(endpoint, {
             method: 'POST',
-            headers: evolutionHeaders,
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': apiKey
+            },
             body: JSON.stringify(payload)
           })
 
           const sendData = await sendResponse.json()
 
           if (!sendResponse.ok) {
-            throw new Error(`EvolutionAPI Send Error: ${sendData.message}`)
+            throw new Error(`EvolutionAPI Send Error: ${sendData.message || JSON.stringify(sendData)}`)
           }
 
           return new Response(
@@ -229,6 +254,7 @@ serve(async (req) => {
           )
 
         } catch (error) {
+          console.error('Erro ao enviar mensagem:', error)
           throw new Error(`Falha ao enviar mensagem: ${error.message}`)
         }
       }

@@ -65,15 +65,16 @@ export default function MessageDispatcher() {
     const { data, error } = await supabase
       .from("whatsapp_instances")
       .select("*")
-      .eq("user_id", user.id)
-      .eq("status", "connected");
+      .eq("user_id", user.id);
 
     if (error) {
       toast.error("Erro ao carregar instâncias");
       return;
     }
 
-    setInstances(data || []);
+    // Filter only connected instances
+    const connected = (data || []).filter(inst => inst.status === "connected");
+    setInstances(connected);
   };
 
   const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
