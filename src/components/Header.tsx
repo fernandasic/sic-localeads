@@ -24,6 +24,9 @@ const Header = () => {
           <Link to="/whatsapp" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
             WhatsApp
           </Link>
+          <Link to="/disparador" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
+            Disparador
+          </Link>
           <a href="#" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
             Como funciona
           </a>
