@@ -10,7 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { Save } from "lucide-react";
 import Header from "@/components/Header";
 
 interface WhatsAppInstance {
@@ -40,6 +42,8 @@ export default function MessageDispatcher() {
   const [isSending, setIsSending] = useState(false);
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [listName, setListName] = useState("");
 
   useEffect(() => {
     if (!loading && !user) {
@@ -121,6 +125,43 @@ export default function MessageDispatcher() {
 
   const getRandomDelay = (min: number, max: number) => {
     return (Math.floor(Math.random() * (max - min + 1)) + min) * 1000;
+  };
+
+  const handleSaveList = async () => {
+    if (!listName.trim()) {
+      toast.error("Digite um nome para a lista");
+      return;
+    }
+
+    const numbers = phoneNumbers.trim().split("\n").filter((n) => n);
+    if (!numbers.length) {
+      toast.error("Adicione números antes de salvar a lista");
+      return;
+    }
+
+    try {
+      const companies = numbers.map((phone, index) => ({
+        name: `Contato ${index + 1}`,
+        phone: phone.trim()
+      }));
+
+      const { error } = await supabase
+        .from("saved_companies")
+        .insert({
+          user_id: user?.id,
+          list_name: listName.trim(),
+          companies: companies
+        });
+
+      if (error) throw error;
+
+      toast.success("Lista salva com sucesso!");
+      setIsDialogOpen(false);
+      setListName("");
+    } catch (error: any) {
+      console.error("Erro ao salvar lista:", error);
+      toast.error("Erro ao salvar lista: " + error.message);
+    }
   };
 
   const handleDispatch = async () => {
@@ -228,14 +269,43 @@ export default function MessageDispatcher() {
             </div>
 
             <div>
-              <Label htmlFor="numeros">Números de telefone (1 por linha)</Label>
+              <div className="flex items-center justify-between mb-2">
+                <Label htmlFor="numeros">Números de telefone (1 por linha)</Label>
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Save className="w-4 h-4 mr-2" />
+                      Salvar Lista
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Salvar Lista de Contatos</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 mt-4">
+                      <div>
+                        <Label htmlFor="listName">Nome da Lista</Label>
+                        <Input
+                          id="listName"
+                          value={listName}
+                          onChange={(e) => setListName(e.target.value)}
+                          placeholder="Digite o nome da lista"
+                          className="mt-2"
+                        />
+                      </div>
+                      <Button onClick={handleSaveList} className="w-full">
+                        Salvar
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
               <Textarea
                 id="numeros"
                 value={phoneNumbers}
                 onChange={(e) => setPhoneNumbers(e.target.value)}
                 placeholder="Ex: 5599999999999"
                 rows={5}
-                className="mt-2"
               />
             </div>
 
