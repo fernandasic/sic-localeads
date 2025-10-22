@@ -146,10 +146,10 @@ export default function MessageDispatcher() {
       }));
 
       const { error } = await supabase
-        .from("saved_companies")
+        .from("saved_lists")
         .insert({
           user_id: user?.id,
-          list_name: listName.trim(),
+          name: listName.trim(),
           companies: companies
         });
 
