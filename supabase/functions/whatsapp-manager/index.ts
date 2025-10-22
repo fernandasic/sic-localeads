@@ -309,18 +309,21 @@ serve(async (req) => {
               break
             case 'imagem':
               endpoint = `${baseUrl}/message/sendMedia/${instanceId}`
-              payload.mediaUrl = message
-              payload.mediaType = 'image'
+              payload.media = message
+              payload.mediatype = 'image'
+              console.log('📤 Enviando imagem:', { endpoint, payload, messageType })
               break
             case 'audio':
               endpoint = `${baseUrl}/message/sendMedia/${instanceId}`
-              payload.mediaUrl = message
-              payload.mediaType = 'audio'
+              payload.media = message
+              payload.mediatype = 'audio'
+              console.log('📤 Enviando áudio:', { endpoint, payload, messageType })
               break
             case 'video':
               endpoint = `${baseUrl}/message/sendMedia/${instanceId}`
-              payload.mediaUrl = message
-              payload.mediaType = 'video'
+              payload.media = message
+              payload.mediatype = 'video'
+              console.log('📤 Enviando vídeo:', { endpoint, payload, messageType })
               break
             default:
               throw new Error('Tipo de mensagem inválido')
