@@ -50,19 +50,41 @@ serve(async (req) => {
 
     console.log(`[google-maps-proxy] Searching for: ${type} near ${address}`);
 
-    // Consultar a API de Geocoding para converter endereço em latitude/longitude
+    // 1) Tenta Geocoding para obter latitude/longitude
     const geocodeRes = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${googleMapsApiKey}`
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&region=br&key=${googleMapsApiKey}`
     );
     const geocodeData = await geocodeRes.json();
-    if (geocodeData.status !== "OK" || !geocodeData.results?.[0]?.geometry?.location) {
-      const errorPayload = { error: `Endereço não encontrado ou erro na geolocalização: ${geocodeData.status}` };
-      return new Response(JSON.stringify(errorPayload), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+
+    let lat: number | undefined;
+    let lng: number | undefined;
+
+    if (geocodeData.status === "OK" && geocodeData.results?.[0]?.geometry?.location) {
+      ({ lat, lng } = geocodeData.results[0].geometry.location);
+      console.log(`[google-maps-proxy] Geocoding OK: ${lat},${lng}`);
+    } else {
+      // 2) Fallback: Places Text Search (evita depender da Geocoding API)
+      console.warn(
+        `[google-maps-proxy] Geocoding falhou: ${geocodeData.status} ${geocodeData.error_message || ''}. Tentando fallback com Text Search...`
+      );
+      const textSearchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(`${type} em ${address}`)}&language=pt-BR&region=br&key=${googleMapsApiKey}`;
+      const textRes = await fetch(textSearchUrl);
+      const textData = await textRes.json();
+
+      if (textData.status === "OK" && textData.results?.[0]?.geometry?.location) {
+        ({ lat, lng } = textData.results[0].geometry.location);
+        console.log(`[google-maps-proxy] Fallback Text Search OK: ${lat},${lng}`);
+      } else {
+        const errorPayload = {
+          error: `Endereço não encontrado ou erro na geolocalização: ${geocodeData.status}`,
+          details: geocodeData.error_message || textData.error_message || 'Sem detalhes',
+        };
+        return new Response(JSON.stringify(errorPayload), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
-    const { lat, lng } = geocodeData.results[0].geometry.location;
 
     // Determinar o tipo de pesquisa
     const lowerType = type.toLowerCase();
