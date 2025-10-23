@@ -52,28 +52,39 @@ const Index = () => {
     setLastSearchParams({ address, radius, type });
 
     try {
-      const { data, error: funcError } = await supabase.functions.invoke("google-maps-proxy", {
-        body: { address, radius, type },
+      // Enviar dados para o webhook do n8n
+      const webhookUrl = 'https://webhookn8nsic.agentessic.com/webhook/Gerarleads';
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tipo_empresa: type,
+          localizacao: address,
+          raio_busca_km: radius / 1000, // Converter metros para km
+        }),
       });
 
-      if (funcError) {
-        setError("Erro na comunicação com o servidor: " + funcError.message);
-        return;
+      if (!response.ok) {
+        throw new Error(`Erro HTTP: ${response.status}`);
       }
 
+      const data = await response.json();
+
+      // Verificar se há resultados no retorno do webhook
       if (data?.error) {
         setError("Erro: " + data.error);
       } else if (data?.results) {
         setResults(data.results);
-        
-        if (data.results.length === 0) {
-          // ResultsList já lida com isso
-        }
+      } else if (Array.isArray(data)) {
+        // Se o webhook retornar um array diretamente
+        setResults(data);
       } else {
-        setError("Recebida uma resposta inesperada do servidor.");
+        setError("Recebida uma resposta inesperada do webhook.");
       }
     } catch (err: any) {
-      setError("Erro ao executar a busca: " + String(err));
+      setError("Erro ao executar a busca: " + String(err.message || err));
     } finally {
       setIsLoading(false);
     }
