@@ -72,15 +72,39 @@ const Index = () => {
 
       const data = await response.json();
 
-      // Verificar se há resultados no retorno do webhook
-      if (data?.error) {
-        setError("Erro: " + data.error);
-      } else if (data?.results) {
-        setResults(data.results);
-      } else if (Array.isArray(data)) {
-        // Se o webhook retornar um array diretamente
-        setResults(data);
+      console.log('Resposta do webhook:', data);
+
+      // Parsear a resposta do n8n corretamente
+      if (Array.isArray(data) && data.length > 0 && data[0].output) {
+        try {
+          // O output é uma string JSON que precisa ser parseada
+          const empresasArray = JSON.parse(data[0].output);
+          
+          console.log('Empresas parseadas:', empresasArray);
+          
+          if (Array.isArray(empresasArray) && empresasArray.length > 0) {
+            // Mapear os campos do webhook para a interface Business
+            const empresasMapeadas = empresasArray.map((empresa: any) => ({
+              name: empresa.title || '',
+              address: empresa.address || '',
+              phone: empresa.phoneNumber || '',
+              rating: empresa.rating || 0,
+              website: empresa.website || '',
+              opening_hours: undefined,
+              instagram: undefined,
+              whatsapp: undefined,
+            }));
+            
+            setResults(empresasMapeadas);
+          } else {
+            setError("Nenhuma empresa encontrada para os critérios informados.");
+          }
+        } catch (parseError) {
+          console.error('Erro ao parsear output do webhook:', parseError);
+          setError("Erro ao processar a resposta do webhook.");
+        }
       } else {
+        console.error('Formato de resposta inesperado:', data);
         setError("Recebida uma resposta inesperada do webhook.");
       }
     } catch (err: any) {
