@@ -75,34 +75,20 @@ const Index = () => {
       console.log('Resposta do webhook:', data);
 
       // Parsear a resposta do n8n corretamente
-      if (data && data.output) {
+      if (Array.isArray(data) && data.length > 0 && data[0].output) {
         try {
-          // O output é uma string JSON que precisa ser parseada
-          const outputParsed = JSON.parse(data.output);
-          
-          console.log('Output parseado:', outputParsed);
-          
-          // O array de empresas está dentro de uma chave dinâmica (ex: "escritorios_contabilidade")
-          // Pegar o primeiro valor que for um array
-          let empresasArray: any[] = [];
-          
-          for (const key in outputParsed) {
-            if (Array.isArray(outputParsed[key])) {
-              empresasArray = outputParsed[key];
-              break;
-            }
-          }
+          const empresasArray = data[0].output;
           
           console.log('Empresas encontradas:', empresasArray);
           
-          if (empresasArray.length > 0) {
+          if (Array.isArray(empresasArray) && empresasArray.length > 0) {
             // Mapear os campos do webhook para a interface Business
             const empresasMapeadas = empresasArray.map((empresa: any) => ({
-              name: empresa.nome || '',
-              address: empresa.endereco || '',
-              phone: empresa.telefone || '',
-              rating: empresa.avaliacao || 0,
-              website: empresa.site || '',
+              name: empresa.title || '',
+              address: empresa.address || '',
+              phone: empresa.phoneNumber || '',
+              rating: empresa.rating || 0,
+              website: empresa.website || '',
               opening_hours: undefined,
               instagram: undefined,
               whatsapp: undefined,
@@ -113,7 +99,7 @@ const Index = () => {
             setError("Nenhuma empresa encontrada para os critérios informados.");
           }
         } catch (parseError) {
-          console.error('Erro ao parsear output do webhook:', parseError);
+          console.error('Erro ao processar resposta do webhook:', parseError);
           setError("Erro ao processar a resposta do webhook.");
         }
       } else {
