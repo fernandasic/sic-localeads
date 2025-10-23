@@ -74,37 +74,38 @@ const Index = () => {
 
       console.log('Resposta do webhook:', data);
 
-      // Parsear a resposta do n8n corretamente
-      if (Array.isArray(data) && data.length > 0 && data[0].output) {
-        try {
-          const empresasArray = data[0].output;
-          
-          console.log('Empresas encontradas:', empresasArray);
-          
-          if (Array.isArray(empresasArray) && empresasArray.length > 0) {
-            // Mapear os campos do webhook para a interface Business
-            const empresasMapeadas = empresasArray.map((empresa: any) => ({
-              name: empresa.title || '',
-              address: empresa.address || '',
-              phone: empresa.phoneNumber || '',
-              rating: empresa.rating || 0,
-              website: empresa.website || '',
-              opening_hours: undefined,
-              instagram: undefined,
-              whatsapp: undefined,
-            }));
-            
-            setResults(empresasMapeadas);
-          } else {
-            setError("Nenhuma empresa encontrada para os critérios informados.");
-          }
-        } catch (parseError) {
-          console.error('Erro ao processar resposta do webhook:', parseError);
-          setError("Erro ao processar a resposta do webhook.");
+      // Parsear a resposta do n8n corretamente (aceitar ambos formatos: objeto ou array com { output })
+      try {
+        let empresasArray: any[] | null = null;
+
+        if (Array.isArray(data) && data.length > 0 && Array.isArray(data[0]?.output)) {
+          empresasArray = data[0].output;
+        } else if (data && Array.isArray((data as any).output)) {
+          empresasArray = (data as any).output;
         }
-      } else {
-        console.error('Formato de resposta inesperado:', data);
-        setError("Recebida uma resposta inesperada do webhook.");
+
+        console.log('Empresas encontradas:', empresasArray);
+
+        if (Array.isArray(empresasArray) && empresasArray.length > 0) {
+          const empresasMapeadas = empresasArray.map((empresa: any) => ({
+            name: empresa.title || '',
+            address: empresa.address || '',
+            phone: empresa.phoneNumber || '',
+            rating: empresa.rating || 0,
+            website: empresa.website || '',
+            opening_hours: undefined,
+            instagram: undefined,
+            whatsapp: undefined,
+          }));
+
+          setResults(empresasMapeadas);
+        } else {
+          console.error('Formato de resposta inesperado ou lista vazia:', data);
+          setError("Recebida uma resposta inesperada do webhook.");
+        }
+      } catch (parseError) {
+        console.error('Erro ao processar resposta do webhook:', parseError);
+        setError("Erro ao processar a resposta do webhook.");
       }
     } catch (err: any) {
       setError("Erro ao executar a busca: " + String(err.message || err));
