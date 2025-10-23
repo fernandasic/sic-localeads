@@ -75,21 +75,34 @@ const Index = () => {
       console.log('Resposta do webhook:', data);
 
       // Parsear a resposta do n8n corretamente
-      if (Array.isArray(data) && data.length > 0 && data[0].output) {
+      if (data && data.output) {
         try {
           // O output é uma string JSON que precisa ser parseada
-          const empresasArray = JSON.parse(data[0].output);
+          const outputParsed = JSON.parse(data.output);
           
-          console.log('Empresas parseadas:', empresasArray);
+          console.log('Output parseado:', outputParsed);
           
-          if (Array.isArray(empresasArray) && empresasArray.length > 0) {
+          // O array de empresas está dentro de uma chave dinâmica (ex: "escritorios_contabilidade")
+          // Pegar o primeiro valor que for um array
+          let empresasArray: any[] = [];
+          
+          for (const key in outputParsed) {
+            if (Array.isArray(outputParsed[key])) {
+              empresasArray = outputParsed[key];
+              break;
+            }
+          }
+          
+          console.log('Empresas encontradas:', empresasArray);
+          
+          if (empresasArray.length > 0) {
             // Mapear os campos do webhook para a interface Business
             const empresasMapeadas = empresasArray.map((empresa: any) => ({
-              name: empresa.title || '',
-              address: empresa.address || '',
-              phone: empresa.phoneNumber || '',
-              rating: empresa.rating || 0,
-              website: empresa.website || '',
+              name: empresa.nome || '',
+              address: empresa.endereco || '',
+              phone: empresa.telefone || '',
+              rating: empresa.avaliacao || 0,
+              website: empresa.site || '',
               opening_hours: undefined,
               instagram: undefined,
               whatsapp: undefined,
