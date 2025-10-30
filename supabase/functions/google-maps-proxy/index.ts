@@ -116,10 +116,40 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[google-maps-proxy] Found ${placesData.results?.length || 0} results for: ${type}`);
+    console.log(`[google-maps-proxy] Found ${placesData.results?.length || 0} results on first page for: ${type}`);
+
+    // Acumular todos os resultados com paginação (até 60 resultados - 3 páginas)
+    let allResults = [...(placesData.results || [])];
+    let nextPageToken = placesData.next_page_token;
+    let pageCount = 1;
+
+    // Buscar páginas adicionais se disponíveis
+    while (nextPageToken && pageCount < 3) {
+      console.log(`[google-maps-proxy] Waiting 2s before fetching page ${pageCount + 1}...`);
+      // Aguardar 2 segundos (obrigatório pela API do Google)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const nextPageUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?pagetoken=${nextPageToken}&key=${googleMapsApiKey}&language=pt-BR`;
+      console.log(`[google-maps-proxy] Fetching page ${pageCount + 1}...`);
+      
+      const nextPageRes = await fetch(nextPageUrl);
+      const nextPageData = await nextPageRes.json();
+      
+      if (nextPageData.status === "OK" && nextPageData.results) {
+        allResults = [...allResults, ...nextPageData.results];
+        nextPageToken = nextPageData.next_page_token;
+        pageCount++;
+        console.log(`[google-maps-proxy] Page ${pageCount} added ${nextPageData.results.length} results. Total: ${allResults.length}`);
+      } else {
+        console.log(`[google-maps-proxy] No more pages available or error: ${nextPageData.status}`);
+        break;
+      }
+    }
+
+    console.log(`[google-maps-proxy] Total results found across ${pageCount} page(s): ${allResults.length}`);
 
     // Para cada resultado, buscar mais detalhes (website, telefone, etc)
-    const resultsPromises = (placesData.results ?? []).map(async (place: any) => {
+    const resultsPromises = allResults.map(async (place: any) => {
       let website = undefined;
       let phone = undefined;
       let instagram = undefined;
