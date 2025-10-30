@@ -1,11 +1,15 @@
 
-import { Search } from 'lucide-react';
+import { Search, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import UserMenu from '@/components/UserMenu';
 import { Link } from 'react-router-dom';
 
-const Header = () => {
+interface HeaderProps {
+  onOpenApiKeyModal?: () => void;
+}
+
+const Header = ({ onOpenApiKeyModal }: HeaderProps) => {
   const { user, loading } = useAuth();
 
   return (
@@ -35,6 +39,16 @@ const Header = () => {
           </a>
         </nav>
         <div className="flex items-center gap-2">
+          {onOpenApiKeyModal && user && (
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={onOpenApiKeyModal}
+              title="Configurar API Key do Google Maps"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          )}
           {loading ? (
             <div className="h-9 w-20 bg-gray-200 animate-pulse rounded" />
           ) : user ? (

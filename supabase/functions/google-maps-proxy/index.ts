@@ -2,7 +2,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const googleMapsApiKey = Deno.env.get('GOOGLE_MAPS_API_KEY');
+const defaultGoogleMapsApiKey = Deno.env.get('GOOGLE_MAPS_API_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,15 +30,18 @@ serve(async (req) => {
   }
 
   try {
+    const { address, radius, type, apiKey } = await req.json();
+    
+    // Usar a API Key do usuário se fornecida, senão usar a chave global
+    const googleMapsApiKey = apiKey || defaultGoogleMapsApiKey;
+    
     if (!googleMapsApiKey) {
-      const errorPayload = { error: "GOOGLE_MAPS_API_KEY não configurada no Supabase Secrets" };
+      const errorPayload = { error: "GOOGLE_MAPS_API_KEY não configurada. Por favor, configure sua chave da API do Google Maps." };
       return new Response(JSON.stringify(errorPayload), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const { address, radius, type } = await req.json();
 
     if (!address || !radius || !type) {
         const errorPayload = { error: "Parâmetros 'address', 'radius' ou 'type' ausentes no corpo da requisição." };

@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Save, FolderOpen, Download } from 'lucide-react';
 import SavedListsModal from '@/components/SavedListsModal';
+import ApiKeyModal from '@/components/ApiKeyModal';
 import { downloadCSV } from '@/utils/csvDownload';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -28,6 +29,16 @@ const Index = () => {
   } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [savedListsModalOpen, setSavedListsModalOpen] = useState(false);
+  const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false);
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string | null>(null);
+
+  // Verificar API Key no localStorage
+  useEffect(() => {
+    const savedApiKey = localStorage.getItem('googleMapsApiKey');
+    if (savedApiKey) {
+      setGoogleMapsApiKey(savedApiKey);
+    }
+  }, []);
 
   // Redirecionar para login se não estiver autenticado
   useEffect(() => {
@@ -38,6 +49,12 @@ const Index = () => {
       navigate('/auth');
     }
   }, [user, authLoading, navigate]);
+
+  const handleSaveApiKey = (apiKey: string) => {
+    localStorage.setItem('googleMapsApiKey', apiKey);
+    setGoogleMapsApiKey(apiKey);
+    setApiKeyModalOpen(false);
+  };
 
   const handleSearch = async (address: string, radius: number, type: string) => {
     if (!user) {
@@ -54,12 +71,19 @@ const Index = () => {
     try {
       console.log('Chamando Google Maps API via Edge Function:', { address, radius, type });
       
+      const requestBody: any = {
+        address: address,
+        radius: radius * 1000, // Converter km para metros
+        type: type
+      };
+
+      // Se o usuário tiver uma API Key configurada, enviá-la
+      if (googleMapsApiKey) {
+        requestBody.apiKey = googleMapsApiKey;
+      }
+      
       const { data, error: edgeFunctionError } = await supabase.functions.invoke('google-maps-proxy', {
-        body: {
-          address: address,
-          radius: radius * 1000, // Converter km para metros
-          type: type
-        }
+        body: requestBody
       });
 
       if (edgeFunctionError) {
@@ -220,7 +244,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 text-foreground">
-      <Header />
+      <Header onOpenApiKeyModal={() => setApiKeyModalOpen(true)} />
       <main>
         <section className="bg-sky-100/80 pt-16 pb-24">
           <div className="container mx-auto text-center">
@@ -287,6 +311,12 @@ const Index = () => {
         isOpen={savedListsModalOpen}
         onClose={() => setSavedListsModalOpen(false)}
         onLoadList={handleLoadSavedList}
+      />
+      
+      <ApiKeyModal 
+        isOpen={apiKeyModalOpen}
+        onClose={() => setApiKeyModalOpen(false)}
+        onSave={handleSaveApiKey}
       />
     </div>
   );
