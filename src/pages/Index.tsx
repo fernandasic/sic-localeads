@@ -73,7 +73,7 @@ const Index = () => {
       
       const requestBody: any = {
         address: address,
-        radius: radius * 1000, // Converter km para metros
+        radius: radius, // Já vem em metros do SearchForm
         type: type
       };
 
