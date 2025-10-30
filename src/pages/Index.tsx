@@ -52,63 +52,53 @@ const Index = () => {
     setLastSearchParams({ address, radius, type });
 
     try {
-      // Enviar dados para o webhook do n8n
-      const webhookUrl = 'https://webhookn8nsic.agentessic.com/webhook/Gerarleads';
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          tipo_empresa: type,
-          localizacao: address,
-          raio_busca_km: radius / 1000, // Converter metros para km
-        }),
+      console.log('Chamando Google Maps API via Edge Function:', { address, radius, type });
+      
+      const { data, error: edgeFunctionError } = await supabase.functions.invoke('google-maps-proxy', {
+        body: {
+          address: address,
+          radius: radius * 1000, // Converter km para metros
+          type: type
+        }
       });
 
-      if (!response.ok) {
-        throw new Error(`Erro HTTP: ${response.status}`);
+      if (edgeFunctionError) {
+        throw new Error(edgeFunctionError.message || 'Erro ao chamar a Edge Function');
       }
 
-      const data = await response.json();
+      console.log('Resposta da Edge Function:', data);
 
-      console.log('Resposta do webhook:', data);
+      if (data?.error) {
+        setError(data.error);
+        return;
+      }
 
-      // Parsear a resposta do n8n corretamente (aceitar ambos formatos: objeto ou array com { output })
-      try {
-        let empresasArray: any[] | null = null;
-
-        if (Array.isArray(data) && data.length > 0 && Array.isArray(data[0]?.output)) {
-          empresasArray = data[0].output;
-        } else if (data && Array.isArray((data as any).output)) {
-          empresasArray = (data as any).output;
+      if (data?.results && Array.isArray(data.results)) {
+        if (data.results.length === 0) {
+          setError("Nenhuma empresa encontrada para os critérios informados.");
+          setResults([]);
+          return;
         }
 
-        console.log('Empresas encontradas:', empresasArray);
+        const empresasMapeadas = data.results.map((empresa: any) => ({
+          name: empresa.name || '',
+          address: empresa.address || '',
+          phone: empresa.phone || '',
+          rating: empresa.rating || 0,
+          website: empresa.website || '',
+          opening_hours: empresa.opening_hours,
+          instagram: empresa.instagram,
+          whatsapp: empresa.whatsapp,
+        }));
 
-        if (Array.isArray(empresasArray) && empresasArray.length > 0) {
-          const empresasMapeadas = empresasArray.map((empresa: any) => ({
-            name: empresa.title || '',
-            address: empresa.address || '',
-            phone: empresa.phoneNumber || '',
-            rating: empresa.rating || 0,
-            website: empresa.website || '',
-            opening_hours: undefined,
-            instagram: undefined,
-            whatsapp: undefined,
-          }));
-
-          setResults(empresasMapeadas);
-        } else {
-          console.error('Formato de resposta inesperado ou lista vazia:', data);
-          setError("Recebida uma resposta inesperada do webhook.");
-        }
-      } catch (parseError) {
-        console.error('Erro ao processar resposta do webhook:', parseError);
-        setError("Erro ao processar a resposta do webhook.");
+        setResults(empresasMapeadas);
+      } else {
+        console.error('Formato de resposta inesperado:', data);
+        setError("Recebida uma resposta inesperada da API.");
       }
     } catch (err: any) {
       setError("Erro ao executar a busca: " + String(err.message || err));
+      console.error('Erro ao buscar empresas:', err);
     } finally {
       setIsLoading(false);
     }
