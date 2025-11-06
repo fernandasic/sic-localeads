@@ -196,82 +196,95 @@ serve(async (req) => {
         const { instanceName } = body
         
         try {
-          const baseUrl = URL_EVOLUTION || EVOLUTION_API_SERVER_URL
-          const apiKey = APIKEY_GLOBAL || EVOLUTION_API_KEY
-          
-          console.log('🔍 Validando instância:', instanceName)
-          console.log('📍 URL base:', baseUrl)
-          
-          // Buscar informações da instância
-          const response = await fetch(`${baseUrl}/instance/fetchInstances`, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': apiKey
+          // Configurações das duas APIs
+          const apis = [
+            {
+              id: 'API_1',
+              url: URL_EVOLUTION || EVOLUTION_API_SERVER_URL,
+              key: APIKEY_GLOBAL || EVOLUTION_API_KEY
+            },
+            {
+              id: 'API_2',
+              url: Deno.env.get('EVOLUTION_API_SERVER_URL_2'),
+              key: Deno.env.get('EVOLUTION_API_KEY_2')
             }
-          })
+          ].filter(api => api.url && api.key) // Só APIs configuradas
           
-          if (!response.ok) {
-            console.error('❌ Erro na resposta da API:', response.status, response.statusText)
-            throw new Error('Erro ao buscar instâncias')
-          }
-
-          const instances = await response.json()
-          console.log('📋 Instâncias retornadas:', JSON.stringify(instances, null, 2))
+          console.log(`🔍 Validando instância "${instanceName}" em ${apis.length} API(s)`)
           
-          // Procurar a instância pelo nome - testar múltiplas estruturas possíveis
-          let instance = null
-          
-          if (Array.isArray(instances)) {
-            console.log('✅ Resposta é um array com', instances.length, 'instâncias')
+          // Buscar em todas as APIs disponíveis
+          for (const api of apis) {
+            console.log(`🔎 Buscando instância na ${api.id}`)
+            console.log(`📍 URL: ${api.url}`)
             
-            // Tentar diferentes estruturas de resposta
-            instance = instances.find((i: any) => {
-              const possibleNames = [
-                i.instance?.instanceName,
-                i.instanceName,
-                i.name,
-                i.instance?.name
-              ]
+            try {
+              const response = await fetch(`${api.url}/instance/fetchInstances`, {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'apikey': api.key
+                }
+              })
               
-              console.log('🔎 Comparando com:', possibleNames)
-              return possibleNames.includes(instanceName)
-            })
-          } else {
-            console.log('⚠️ Resposta não é um array:', typeof instances)
+              if (!response.ok) {
+                console.error(`❌ Erro na ${api.id}:`, response.status)
+                continue // Tentar próxima API
+              }
+
+              const instances = await response.json()
+              
+              if (Array.isArray(instances)) {
+                const instance = instances.find((i: any) => {
+                  const possibleNames = [
+                    i.instance?.instanceName,
+                    i.instanceName,
+                    i.name,
+                    i.instance?.name
+                  ]
+                  return possibleNames.includes(instanceName)
+                })
+                
+                if (instance) {
+                  const state = instance.instance?.state || instance.state || instance.connectionStatus
+                  console.log(`✅ Instância encontrada na ${api.id} com estado: ${state}`)
+                  
+                  if (state !== 'open') {
+                    return new Response(
+                      JSON.stringify({ 
+                        valid: false, 
+                        message: `Instância encontrada na ${api.id} mas não está conectada`,
+                        apiId: api.id,
+                        state: state
+                      }),
+                      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                    )
+                  }
+                  
+                  // Instância encontrada e conectada!
+                  return new Response(
+                    JSON.stringify({ 
+                      valid: true, 
+                      message: `Instância ativa na ${api.id}`,
+                      apiId: api.id,
+                      apiUrl: api.url,
+                      apiKey: api.key,
+                      instance: instance
+                    }),
+                    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                  )
+                }
+              }
+            } catch (apiError) {
+              console.error(`❌ Erro ao buscar na ${api.id}:`, apiError)
+              continue // Tentar próxima API
+            }
           }
           
-          console.log('🎯 Instância encontrada:', instance ? 'SIM' : 'NÃO')
-          
-          if (!instance) {
-            return new Response(
-              JSON.stringify({ 
-                valid: false, 
-                message: 'Instância não encontrada'
-              }),
-              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            )
-          }
-          
-          // Verificar se está conectada (status "open")
-          const state = instance.instance?.state || instance.state || instance.connectionStatus
-          console.log('📊 Estado da instância:', state)
-          
-          if (state !== 'open') {
-            return new Response(
-              JSON.stringify({ 
-                valid: false, 
-                message: 'Instância não está conectada'
-              }),
-              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            )
-          }
-          
+          // Não encontrou em nenhuma API
           return new Response(
             JSON.stringify({ 
-              valid: true, 
-              message: 'Instância ativa e pronta para uso',
-              instance: instance
+              valid: false, 
+              message: 'Instância não encontrada em nenhuma das APIs configuradas'
             }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
@@ -290,7 +303,7 @@ serve(async (req) => {
       }
 
       case 'send-message': {
-        const { instanceId, number, message, messageType } = body
+        const { instanceId, number, message, messageType, apiUrl, apiKey } = body
         
         try {
           let endpoint = ''
@@ -298,9 +311,11 @@ serve(async (req) => {
             number: number
           }
 
-          // Usar URL_EVOLUTION se disponível, senão usar EVOLUTION_API_SERVER_URL
-          const baseUrl = URL_EVOLUTION || EVOLUTION_API_SERVER_URL
-          const apiKey = APIKEY_GLOBAL || EVOLUTION_API_KEY
+          // Usar as credenciais passadas ou as padrão
+          const baseUrl = apiUrl || URL_EVOLUTION || EVOLUTION_API_SERVER_URL
+          const key = apiKey || APIKEY_GLOBAL || EVOLUTION_API_KEY
+
+          console.log(`📤 Enviando mensagem via: ${baseUrl}`)
 
           switch (messageType) {
             case 'texto':
@@ -333,7 +348,7 @@ serve(async (req) => {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'apikey': apiKey
+              'apikey': key
             },
             body: JSON.stringify(payload)
           })

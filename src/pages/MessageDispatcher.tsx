@@ -46,6 +46,11 @@ export default function MessageDispatcher() {
   const [listName, setListName] = useState("");
   const [savedLists, setSavedLists] = useState<Array<{id: string, name: string, companies: any[]}>>([]);
   const [selectedListId, setSelectedListId] = useState<string>("");
+  const [apiInfo, setApiInfo] = useState<{
+    apiId: string;
+    apiUrl: string;
+    apiKey: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -91,11 +96,12 @@ export default function MessageDispatcher() {
     if (!instanceName.trim()) {
       setInstanceStatus('idle');
       setInstanceMessage("");
+      setApiInfo(null);
       return;
     }
 
     setInstanceStatus('checking');
-    setInstanceMessage("Verificando instância...");
+    setInstanceMessage("Verificando instância nas APIs...");
 
     try {
       const { data, error } = await supabase.functions.invoke("whatsapp-manager", {
@@ -109,14 +115,21 @@ export default function MessageDispatcher() {
 
       if (data.valid) {
         setInstanceStatus('active');
-        setInstanceMessage("Instância ativa");
+        setInstanceMessage(`✅ Instância ativa na ${data.apiId}`);
+        setApiInfo({
+          apiId: data.apiId,
+          apiUrl: data.apiUrl,
+          apiKey: data.apiKey
+        });
       } else {
         setInstanceStatus('refused');
         setInstanceMessage(data.message || "Instância recusada");
+        setApiInfo(null);
       }
     } catch (error: any) {
       setInstanceStatus('refused');
       setInstanceMessage("Erro ao verificar instância");
+      setApiInfo(null);
       console.error(error);
     }
   };
@@ -214,7 +227,7 @@ export default function MessageDispatcher() {
       return;
     }
 
-    if (instanceStatus !== 'active') {
+    if (instanceStatus !== 'active' || !apiInfo) {
       toast.error("Por favor, insira uma instância ativa antes de disparar");
       return;
     }
@@ -236,14 +249,16 @@ export default function MessageDispatcher() {
               number: numbers[i],
               message: msg.content,
               messageType: msg.type,
+              apiUrl: apiInfo.apiUrl,    // Passar URL da API correta
+              apiKey: apiInfo.apiKey      // Passar chave da API correta
             },
           });
 
           if (error) throw error;
 
-          logs.push(`✅ ${numbers[i]} via ${instanceName} - ${msg.type}: OK`);
+          logs.push(`✅ ${numbers[i]} via ${instanceName} (${apiInfo.apiId}) - ${msg.type}: OK`);
         } catch (error: any) {
-          logs.push(`❌ ${numbers[i]} via ${instanceName} - Erro: ${error.message}`);
+          logs.push(`❌ ${numbers[i]} via ${instanceName} (${apiInfo.apiId}) - Erro: ${error.message}`);
         }
       }
 
@@ -300,10 +315,12 @@ export default function MessageDispatcher() {
                 className="mt-2"
               />
               {instanceStatus === 'checking' && (
-                <p className="text-blue-500 mt-2 text-sm">🔍 Verificando instância...</p>
+                <p className="text-blue-500 mt-2 text-sm">🔍 Verificando instância nas APIs...</p>
               )}
-              {instanceStatus === 'active' && (
-                <p className="text-green-500 mt-2 text-sm font-semibold">✅ Instância ativa</p>
+              {instanceStatus === 'active' && apiInfo && (
+                <p className="text-green-500 mt-2 text-sm font-semibold">
+                  ✅ Instância ativa na {apiInfo.apiId}
+                </p>
               )}
               {instanceStatus === 'refused' && (
                 <p className="text-red-500 mt-2 text-sm font-semibold">❌ {instanceMessage}</p>
