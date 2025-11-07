@@ -12,8 +12,25 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Save } from "lucide-react";
+import { Save, GripVertical } from "lucide-react";
 import Header from "@/components/Header";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface WhatsAppInstance {
   id: string;
@@ -23,8 +40,73 @@ interface WhatsAppInstance {
 }
 
 interface Message {
+  id: string;
   type: "texto" | "imagem" | "audio" | "video";
   content: string;
+}
+
+interface SortableMessageProps {
+  message: Message;
+  index: number;
+  updateMessage: (index: number, field: "type" | "content", value: string) => void;
+}
+
+function SortableMessage({ message, index, updateMessage }: SortableMessageProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: message.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="border rounded-lg p-4 space-y-3 bg-card"
+    >
+      <div className="flex items-center gap-2">
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing touch-none"
+        >
+          <GripVertical className="w-5 h-5 text-muted-foreground" />
+        </div>
+        <Label className="flex-1">Mensagem {index + 1}</Label>
+      </div>
+      <Select
+        value={message.type}
+        onValueChange={(value: any) => updateMessage(index, "type", value)}
+      >
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="texto">Texto</SelectItem>
+          <SelectItem value="imagem">Imagem</SelectItem>
+          <SelectItem value="audio">Áudio</SelectItem>
+          <SelectItem value="video">Vídeo</SelectItem>
+        </SelectContent>
+      </Select>
+      <Input
+        value={message.content}
+        onChange={(e) => updateMessage(index, "content", e.target.value)}
+        placeholder={message.type === "texto" ? "Digite o texto" : "Cole o link do arquivo"}
+      />
+      {message.content && message.type === "imagem" && /\.(jpg|jpeg|png|gif|webp)$/i.test(message.content) && (
+        <img src={message.content} alt="preview" className="max-w-full max-h-48 rounded object-contain" />
+      )}
+    </div>
+  );
 }
 
 export default function MessageDispatcher() {
@@ -37,7 +119,7 @@ export default function MessageDispatcher() {
   const [minDelay, setMinDelay] = useState("2");
   const [maxDelay, setMaxDelay] = useState("5");
   const [messageCount, setMessageCount] = useState(1);
-  const [messages, setMessages] = useState<Message[]>([{ type: "texto", content: "" }]);
+  const [messages, setMessages] = useState<Message[]>([{ id: "msg-1", type: "texto", content: "" }]);
   const [useAI, setUseAI] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -60,10 +142,29 @@ export default function MessageDispatcher() {
 
   useEffect(() => {
     const newMessages = Array.from({ length: messageCount }, (_, i) => 
-      messages[i] || { type: "texto" as const, content: "" }
+      messages[i] || { id: `msg-${i + 1}`, type: "texto" as const, content: "" }
     );
     setMessages(newMessages);
   }, [messageCount]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setMessages((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -438,33 +539,25 @@ export default function MessageDispatcher() {
               />
             </div>
 
-            {messages.map((msg, index) => (
-              <div key={index} className="border rounded-lg p-4 space-y-3">
-                <Label>Mensagem {index + 1}</Label>
-                <Select
-                  value={msg.type}
-                  onValueChange={(value: any) => updateMessage(index, "type", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="texto">Texto</SelectItem>
-                    <SelectItem value="imagem">Imagem</SelectItem>
-                    <SelectItem value="audio">Áudio</SelectItem>
-                    <SelectItem value="video">Vídeo</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  value={msg.content}
-                  onChange={(e) => updateMessage(index, "content", e.target.value)}
-                  placeholder={msg.type === "texto" ? "Digite o texto" : "Cole o link do arquivo"}
-                />
-                {msg.content && msg.type === "imagem" && /\.(jpg|jpeg|png|gif|webp)$/i.test(msg.content) && (
-                  <img src={msg.content} alt="preview" className="max-w-full max-h-48 rounded object-contain" />
-                )}
-              </div>
-            ))}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={messages.map(m => m.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {messages.map((msg, index) => (
+                  <SortableMessage
+                    key={msg.id}
+                    message={msg}
+                    index={index}
+                    updateMessage={updateMessage}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
 
             <div className="flex items-center gap-3">
               <Switch id="usarIA" checked={useAI} onCheckedChange={setUseAI} />
