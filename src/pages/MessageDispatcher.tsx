@@ -12,7 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Save, GripVertical } from "lucide-react";
+import { Save, GripVertical, BookmarkPlus } from "lucide-react";
 import Header from "@/components/Header";
 import {
   DndContext,
@@ -133,6 +133,10 @@ export default function MessageDispatcher() {
     apiUrl: string;
     apiKey: string;
   } | null>(null);
+  const [savedMessages, setSavedMessages] = useState<Array<{id: string, name: string, messages: Message[]}>>([]);
+  const [selectedSavedMessageId, setSelectedSavedMessageId] = useState<string>("");
+  const [isSaveMessageDialogOpen, setIsSaveMessageDialogOpen] = useState(false);
+  const [saveMessageName, setSaveMessageName] = useState("");
 
   useEffect(() => {
     if (!loading && !user) {
@@ -169,6 +173,7 @@ export default function MessageDispatcher() {
   useEffect(() => {
     if (user) {
       loadSavedLists();
+      loadSavedMessages();
     }
   }, [user]);
 
@@ -190,6 +195,27 @@ export default function MessageDispatcher() {
       })));
     } catch (error: any) {
       console.error("Erro ao carregar listas:", error);
+    }
+  };
+
+  const loadSavedMessages = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("saved_messages")
+        .select("id, name, messages")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      setSavedMessages((data || []).map(item => ({
+        id: item.id,
+        name: item.name,
+        messages: Array.isArray(item.messages) ? item.messages as unknown as Message[] : []
+      })));
+    } catch (error: any) {
+      console.error("Erro ao carregar mensagens salvas:", error);
     }
   };
 
@@ -270,6 +296,50 @@ export default function MessageDispatcher() {
     setPhoneNumbers(phones.join("\n"));
     
     toast.success(`Lista "${selectedList.name}" carregada com ${phones.length} números`);
+  };
+
+  const handleLoadSavedMessage = (messageId: string) => {
+    setSelectedSavedMessageId(messageId);
+    
+    const selectedMessage = savedMessages.find(msg => msg.id === messageId);
+    if (!selectedMessage) return;
+    
+    setMessages(selectedMessage.messages);
+    setMessageCount(selectedMessage.messages.length);
+    
+    toast.success(`Mensagem "${selectedMessage.name}" carregada`);
+  };
+
+  const handleSaveMessage = async () => {
+    if (!saveMessageName.trim()) {
+      toast.error("Digite um nome para a mensagem");
+      return;
+    }
+
+    if (messages.length === 0 || messages.every(m => !m.content.trim())) {
+      toast.error("Adicione pelo menos uma mensagem antes de salvar");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("saved_messages")
+        .insert([{
+          user_id: user?.id,
+          name: saveMessageName.trim(),
+          messages: messages as any
+        }]);
+
+      if (error) throw error;
+
+      toast.success("Mensagem salva com sucesso!");
+      setIsSaveMessageDialogOpen(false);
+      setSaveMessageName("");
+      loadSavedMessages();
+    } catch (error: any) {
+      console.error("Erro ao salvar mensagem:", error);
+      toast.error("Erro ao salvar mensagem: " + error.message);
+    }
   };
 
   const updateMessage = (index: number, field: "type" | "content", value: string) => {
@@ -405,6 +475,27 @@ export default function MessageDispatcher() {
           </div>
 
           <div className="space-y-6">
+            <div>
+              <Label htmlFor="selectSavedMessage">Mensagens Salvas</Label>
+              <Select value={selectedSavedMessageId} onValueChange={handleLoadSavedMessage}>
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder="Selecione uma mensagem salva" />
+                </SelectTrigger>
+                <SelectContent className="bg-background z-50">
+                  {savedMessages.length === 0 ? (
+                    <SelectItem value="empty" disabled>
+                      Nenhuma mensagem salva
+                    </SelectItem>
+                  ) : (
+                    savedMessages.map((msg) => (
+                      <SelectItem key={msg.id} value={msg.id}>
+                        {msg.name} ({msg.messages?.length || 0} mensagens)
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <Label htmlFor="instanceName">Nome da Instância</Label>
               <Input
@@ -564,14 +655,45 @@ export default function MessageDispatcher() {
               <Label htmlFor="usarIA">Usar IA para ajustes automáticos no texto</Label>
             </div>
 
-            <Button
-              onClick={handleDispatch}
-              disabled={isSending}
-              className="w-full"
-              size="lg"
-            >
-              {isSending ? "Enviando..." : "🚀 Disparar"}
-            </Button>
+            <div className="flex gap-3">
+              <Dialog open={isSaveMessageDialogOpen} onOpenChange={setIsSaveMessageDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="flex-1">
+                    <BookmarkPlus className="w-4 h-4 mr-2" />
+                    Salvar Mensagem
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Salvar Template de Mensagem</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 mt-4">
+                    <div>
+                      <Label htmlFor="saveMessageName">Nome do Template</Label>
+                      <Input
+                        id="saveMessageName"
+                        value={saveMessageName}
+                        onChange={(e) => setSaveMessageName(e.target.value)}
+                        placeholder="Digite o nome do template"
+                        className="mt-2"
+                      />
+                    </div>
+                    <Button onClick={handleSaveMessage} className="w-full">
+                      Salvar
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <Button
+                onClick={handleDispatch}
+                disabled={isSending}
+                className="flex-1"
+                size="lg"
+              >
+                {isSending ? "Enviando..." : "🚀 Disparar"}
+              </Button>
+            </div>
 
             {isSending && (
               <div className="space-y-2">
