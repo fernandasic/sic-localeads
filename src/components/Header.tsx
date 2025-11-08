@@ -1,42 +1,66 @@
-
-import { Search } from 'lucide-react';
+import { Search, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import UserMenu from '@/components/UserMenu';
 import { Link } from 'react-router-dom';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import { useState } from 'react';
 
 const Header = () => {
   const { user, loading } = useAuth();
+  const [isOpen, setIsOpen] = useState(false);
+
+  const navLinks = [
+    { to: '/', label: 'Empresas' },
+    { to: '/whatsapp', label: 'WhatsApp' },
+    { to: '/disparador', label: 'Disparador' },
+    { href: '#', label: 'Como funciona' },
+    { href: '#', label: 'Preços' },
+  ];
 
   return (
-    <header className="py-4 border-b bg-white sticky top-0 z-50">
-      <div className="container mx-auto flex justify-between items-center">
+    <header className="py-4 border-b bg-background sticky top-0 z-50">
+      <div className="container mx-auto flex justify-between items-center px-4">
         <div className="flex items-center gap-2">
           <Search className="h-6 w-6 text-primary" />
           <Link to="/">
             <h1 className="text-2xl font-bold text-primary">Sic-Localeads</h1>
           </Link>
         </div>
+        
+        {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-6">
-          <Link to="/" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
-            Empresas
-          </Link>
-          <Link to="/whatsapp" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
-            WhatsApp
-          </Link>
-          <Link to="/disparador" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
-            Disparador
-          </Link>
-          <a href="#" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
-            Como funciona
-          </a>
-          <a href="#" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
-            Preços
-          </a>
+          {navLinks.map((link) => 
+            link.to ? (
+              <Link 
+                key={link.label}
+                to={link.to} 
+                className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+              >
+                {link.label}
+              </Link>
+            ) : (
+              <a 
+                key={link.label}
+                href={link.href} 
+                className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+              >
+                {link.label}
+              </a>
+            )
+          )}
         </nav>
-        <div className="flex items-center gap-2">
+
+        {/* Desktop Auth */}
+        <div className="hidden md:flex items-center gap-2">
           {loading ? (
-            <div className="h-9 w-20 bg-gray-200 animate-pulse rounded" />
+            <div className="h-9 w-20 bg-muted animate-pulse rounded" />
           ) : user ? (
             <UserMenu />
           ) : (
@@ -45,10 +69,60 @@ const Header = () => {
                 <Button variant="outline">Login</Button>
               </Link>
               <Link to="/auth">
-                <Button className="bg-cyan-500 hover:bg-cyan-600 text-white">Registrar</Button>
+                <Button>Registrar</Button>
               </Link>
             </div>
           )}
+        </div>
+
+        {/* Mobile Menu */}
+        <div className="md:hidden flex items-center gap-2">
+          {!loading && user && <UserMenu />}
+          <Sheet open={isOpen} onOpenChange={setIsOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Menu className="h-6 w-6" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[280px]">
+              <SheetHeader>
+                <SheetTitle>Menu</SheetTitle>
+              </SheetHeader>
+              <nav className="flex flex-col gap-4 mt-6">
+                {navLinks.map((link) => 
+                  link.to ? (
+                    <Link 
+                      key={link.label}
+                      to={link.to}
+                      onClick={() => setIsOpen(false)}
+                      className="text-base font-medium text-foreground hover:text-primary transition-colors py-2"
+                    >
+                      {link.label}
+                    </Link>
+                  ) : (
+                    <a 
+                      key={link.label}
+                      href={link.href}
+                      onClick={() => setIsOpen(false)}
+                      className="text-base font-medium text-foreground hover:text-primary transition-colors py-2"
+                    >
+                      {link.label}
+                    </a>
+                  )
+                )}
+                {!user && (
+                  <div className="flex flex-col gap-2 mt-4 pt-4 border-t">
+                    <Link to="/auth" onClick={() => setIsOpen(false)}>
+                      <Button variant="outline" className="w-full">Login</Button>
+                    </Link>
+                    <Link to="/auth" onClick={() => setIsOpen(false)}>
+                      <Button className="w-full">Registrar</Button>
+                    </Link>
+                  </div>
+                )}
+              </nav>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
     </header>
