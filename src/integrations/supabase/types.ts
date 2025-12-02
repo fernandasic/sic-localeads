@@ -32,6 +32,117 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_lists: {
+        Row: {
+          companies: Json
+          created_at: string
+          id: string
+          name: string
+          search_params: Json | null
+          user_id: string
+        }
+        Insert: {
+          companies: Json
+          created_at?: string
+          id?: string
+          name: string
+          search_params?: Json | null
+          user_id: string
+        }
+        Update: {
+          companies?: Json
+          created_at?: string
+          id?: string
+          name?: string
+          search_params?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      saved_messages: {
+        Row: {
+          created_at: string
+          id: string
+          messages: Json
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          messages: Json
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          messages?: Json
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_evolution_credentials: {
+        Row: {
+          api_key: string
+          api_url: string
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_key: string
+          api_url: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_key?: string
+          api_url?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_instances: {
+        Row: {
+          created_at: string
+          id: string
+          instance_id: string
+          phone_number: string | null
+          qr_code: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          instance_id: string
+          phone_number?: string | null
+          qr_code?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          instance_id?: string
+          phone_number?: string | null
+          qr_code?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
