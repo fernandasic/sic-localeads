@@ -14,202 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
-      profiles: {
+      atualizacaodetabela: {
         Row: {
-          avatar_url: string | null
           created_at: string
-          full_name: string | null
-          id: string
-          updated_at: string
-          user_id: string
+          id: number
+          numero: number | null
         }
         Insert: {
-          avatar_url?: string | null
           created_at?: string
-          full_name?: string | null
-          id: string
-          updated_at?: string
-          user_id: string
+          id?: number
+          numero?: number | null
         }
         Update: {
-          avatar_url?: string | null
           created_at?: string
-          full_name?: string | null
-          id?: string
-          updated_at?: string
-          user_id?: string
+          id?: number
+          numero?: number | null
         }
         Relationships: []
-      }
-      saved_companies: {
-        Row: {
-          companies: Json
-          created_at: string
-          id: string
-          list_name: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          companies?: Json
-          created_at?: string
-          id?: string
-          list_name: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          companies?: Json
-          created_at?: string
-          id?: string
-          list_name?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      saved_lists: {
-        Row: {
-          companies: Json | null
-          created_at: string
-          id: string
-          name: string
-          search_params: Json | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          companies?: Json | null
-          created_at?: string
-          id?: string
-          name: string
-          search_params?: Json | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          companies?: Json | null
-          created_at?: string
-          id?: string
-          name?: string
-          search_params?: Json | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "saved_lists_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["user_id"]
-          },
-        ]
-      }
-      saved_messages: {
-        Row: {
-          created_at: string
-          id: string
-          messages: Json
-          name: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          messages?: Json
-          name: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          messages?: Json
-          name?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      user_roles: {
-        Row: {
-          created_at: string
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
-      }
-      whatsapp_instances: {
-        Row: {
-          created_at: string
-          id: string
-          instance_name: string
-          phone_number: string | null
-          qr_code: string | null
-          status: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          instance_name: string
-          phone_number?: string | null
-          qr_code?: string | null
-          status?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          instance_name?: string
-          phone_number?: string | null
-          qr_code?: string | null
-          status?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "whatsapp_instances_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["user_id"]
-          },
-        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
+      [_ in never]: never
     }
     Enums: {
-      app_role: "admin" | "user"
+      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never
@@ -336,8 +167,6 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {
-      app_role: ["admin", "user"],
-    },
+    Enums: {},
   },
 } as const
