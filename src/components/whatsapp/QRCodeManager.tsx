@@ -96,7 +96,7 @@ const QRCodeManager = () => {
     return null;
   };
 
-  // Função para obter QR Code do webhook
+  // Função para obter QR Code usando credenciais do usuário
   const fetchQRCode = useCallback(async (instanceId: string, phoneNum: string, isInitial = false) => {
     if (!user) return;
 
@@ -105,77 +105,59 @@ const QRCodeManager = () => {
       
       console.log('=== BUSCANDO QR CODE ===');
       console.log('Instância:', instanceId);
-      console.log('Telefone:', phoneNum);
-      console.log('Is Initial:', isInitial);
 
-      const webhookResponse = await fetch('https://n8nsic.agentessic.com/webhook-test/qrcode', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          instanceName: instanceId,
+      const { data, error } = await supabase.functions.invoke('whatsapp-user-manager', {
+        body: {
+          action: 'get-qrcode',
+          instanceId,
           phoneNumber: phoneNum,
-          userId: user.id,
-          userEmail: user.email,
-          action: 'get-qrcode'
-        })
+        },
       });
 
-      console.log('Status da resposta:', webhookResponse.status);
-      console.log('Headers da resposta:', Object.fromEntries(webhookResponse.headers.entries()));
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
 
-      if (!webhookResponse.ok) {
-        const errorText = await webhookResponse.text();
-        console.error('Erro HTTP do webhook:', errorText);
-        throw new Error(`Erro ${webhookResponse.status}: ${errorText}`);
-      }
-
-      const webhookData = await webhookResponse.json();
-      console.log('=== DADOS DO WEBHOOK ===');
-      console.log(JSON.stringify(webhookData, null, 2));
+      console.log('=== DADOS DA EDGE FUNCTION ===');
+      console.log(JSON.stringify(data.data, null, 2));
       
-      const extractedQRCode = extractQRCodeFromResponse(webhookData);
+      const extractedQRCode = extractQRCodeFromResponse(data.data);
       
       if (extractedQRCode) {
         console.log('✅ QR Code extraído com sucesso');
         setQrCode(extractedQRCode);
         
-        // Atualizar no banco apenas se for inicial
-        if (isInitial) {
-          try {
-            const { error: dbError } = await supabase
-              .from('whatsapp_instances' as any)
-              .update({ qr_code: extractedQRCode })
-              .eq('instance_id', instanceId)
-              .eq('user_id', user.id);
-              
-            if (dbError) {
-              console.error('Erro ao atualizar QR Code no banco:', dbError);
-            } else {
-              console.log('QR Code salvo no banco com sucesso');
-            }
-          } catch (dbErr) {
-            console.error('Erro na operação do banco:', dbErr);
-          }
-        }
-        
         if (!isInitial) {
           console.log('🔄 QR Code renovado com sucesso');
         }
+      } else if (data.data?.state === 'open' || data.data?.status === 'connected') {
+        console.log('🟢 WhatsApp já conectado!');
+        setInstanceStatus('connected');
+        setPhoneNumber(data.data?.phoneNumber || phoneNum);
+        
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+        if (countdownRef.current) {
+          clearInterval(countdownRef.current);
+          countdownRef.current = null;
+        }
+        
+        toast({
+          title: "Sucesso!",
+          description: "WhatsApp já está conectado!",
+        });
       } else {
-        console.error('❌ QR Code não pôde ser extraído da resposta');
-        throw new Error('QR Code não encontrado ou inválido na resposta do webhook');
+        console.log('⚠️ QR Code não disponível');
       }
     } catch (err: any) {
       console.error('=== ERRO AO BUSCAR QR CODE ===');
       console.error('Erro completo:', err);
-      console.error('Stack trace:', err.stack);
       
       if (isInitial) {
         toast({
           title: "Erro",
-          description: `Erro ao obter QR Code: ${err.message}`,
+          description: err.message || 'Erro ao obter QR Code',
           variant: "destructive",
         });
       }
@@ -191,90 +173,46 @@ const QRCodeManager = () => {
     try {
       console.log('=== VERIFICANDO STATUS DA CONEXÃO ===');
       console.log('Instância:', instanceId);
-      console.log('Telefone:', phoneNum);
 
-      const webhookResponse = await fetch('https://n8nsic.agentessic.com/webhook-test/qrcode', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          instanceName: instanceId,
+      const { data, error } = await supabase.functions.invoke('whatsapp-user-manager', {
+        body: {
+          action: 'check-status',
+          instanceId,
           phoneNumber: phoneNum,
-          userId: user.id,
-          userEmail: user.email,
-          action: 'check-status'
-        })
+        },
       });
 
-      if (webhookResponse.ok) {
-        const statusData = await webhookResponse.json();
-        console.log('=== STATUS DA INSTÂNCIA ===');
-        console.log(JSON.stringify(statusData, null, 2));
-        
-        // Verificar diferentes campos de status
-        const isConnected = statusData.status === 'connected' || 
-                           statusData.connected === true ||
-                           statusData.state === 'connected' ||
-                           statusData.connectionState === 'open' ||
-                           (statusData.data && statusData.data.connected);
-        
-        if (isConnected) {
-          console.log('🟢 WHATSAPP CONECTADO!');
-          setInstanceStatus('connected');
-          
-          // Extrair número de telefone de diferentes campos possíveis
-          const detectedPhone = statusData.phoneNumber || 
-                               statusData.phone || 
-                               statusData.number ||
-                               statusData.wuid ||
-                               (statusData.data && statusData.data.phoneNumber) ||
-                               phoneNum;
-          
-          setPhoneNumber(detectedPhone);
-          
-          // Parar renovação automática
-          if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
-            console.log('🛑 Renovação automática parada');
-          }
-          if (countdownRef.current) {
-            clearInterval(countdownRef.current);
-            countdownRef.current = null;
-          }
-          
-          // Atualizar no banco
-          try {
-            const { error: dbError } = await supabase
-              .from('whatsapp_instances' as any)
-              .update({ 
-                status: 'connected',
-                phone_number: detectedPhone
-              })
-              .eq('instance_id', instanceId)
-              .eq('user_id', user.id);
-              
-            if (dbError) {
-              console.error('Erro ao atualizar status no banco:', dbError);
-            } else {
-              console.log('✅ Status atualizado no banco');
-            }
-          } catch (dbErr) {
-            console.error('Erro na operação do banco:', dbErr);
-          }
+      if (error) throw error;
 
-          toast({
-            title: "Sucesso!",
-            description: `WhatsApp conectado com sucesso! Número: ${detectedPhone}`,
-          });
-        } else {
-          console.log('🟡 Ainda aguardando conexão...');
+      console.log('=== STATUS DA INSTÂNCIA ===');
+      console.log(JSON.stringify(data.data, null, 2));
+      
+      if (data.data?.state === 'open') {
+        console.log('🟢 WHATSAPP CONECTADO!');
+        setInstanceStatus('connected');
+        
+        const detectedPhone = data.data?.instance?.phoneNumber || phoneNum;
+        setPhoneNumber(detectedPhone);
+        
+        // Parar renovação automática
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+          console.log('🛑 Renovação automática parada');
         }
+        if (countdownRef.current) {
+          clearInterval(countdownRef.current);
+          countdownRef.current = null;
+        }
+
+        toast({
+          title: "Sucesso!",
+          description: `WhatsApp conectado com sucesso! Número: ${detectedPhone}`,
+        });
       } else {
-        console.log('❌ Erro ao verificar status:', webhookResponse.status);
+        console.log('🟡 Ainda aguardando conexão...');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('=== ERRO AO VERIFICAR STATUS ===');
       console.error('Erro:', err);
     }
@@ -331,55 +269,21 @@ const QRCodeManager = () => {
       console.log('=== CRIANDO NOVA INSTÂNCIA ===');
       console.log('Nome da instância:', instanceName.trim());
       console.log('Número de telefone:', phoneNumberInput.trim());
-      console.log('User ID:', user.id);
-      console.log('User email:', user.email);
 
-      // Criar instância via webhook
-      const webhookResponse = await fetch('https://n8nsic.agentessic.com/webhook-test/qrcode', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          instanceName: instanceName.trim(),
+      // Criar instância usando edge function com credenciais do usuário
+      const { data, error } = await supabase.functions.invoke('whatsapp-user-manager', {
+        body: {
+          action: 'create-instance',
+          instanceId: instanceName.trim(),
           phoneNumber: phoneNumberInput.trim(),
-          userId: user.id,
-          userEmail: user.email,
-          action: 'create-instance'
-        })
+        },
       });
 
-      console.log('Status da criação:', webhookResponse.status);
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
 
-      if (!webhookResponse.ok) {
-        const errorText = await webhookResponse.text();
-        console.error('Erro HTTP na criação:', errorText);
-        throw new Error(`Erro ${webhookResponse.status}: ${errorText}`);
-      }
-
-      const webhookData = await webhookResponse.json();
       console.log('=== INSTÂNCIA CRIADA ===');
-      console.log(JSON.stringify(webhookData, null, 2));
-      
-      // Salvar instância no banco
-      try {
-        const { error: dbError } = await supabase
-          .from('whatsapp_instances' as any)
-          .insert({
-            user_id: user.id,
-            instance_id: instanceName.trim(),
-            phone_number: phoneNumberInput.trim(),
-            status: 'pending'
-          });
-
-        if (dbError) {
-          console.error('Erro ao salvar no banco:', dbError);
-        } else {
-          console.log('✅ Instância salva no banco');
-        }
-      } catch (dbErr) {
-        console.error('Erro na operação do banco:', dbErr);
-      }
+      console.log(JSON.stringify(data, null, 2));
 
       // Buscar QR Code inicial
       await fetchQRCode(instanceName.trim(), phoneNumberInput.trim(), true);
@@ -399,7 +303,7 @@ const QRCodeManager = () => {
       
       toast({
         title: "Erro",
-        description: `Erro ao criar instância: ${err.message || 'Erro desconhecido'}`,
+        description: err.message || 'Erro ao criar instância',
         variant: "destructive",
       });
     } finally {
