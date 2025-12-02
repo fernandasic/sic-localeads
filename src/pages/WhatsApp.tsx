@@ -10,7 +10,8 @@ import InstanceManager from '@/components/whatsapp/InstanceManager';
 import MessageComposer from '@/components/whatsapp/MessageComposer';
 import ContactSelector from '@/components/whatsapp/ContactSelector';
 import BulkSender from '@/components/whatsapp/BulkSender';
-import { Smartphone, MessageSquare, Users, Send } from 'lucide-react';
+import { EvolutionApiSettings } from '@/components/whatsapp/EvolutionApiSettings';
+import { Smartphone, MessageSquare, Users, Send, Settings } from 'lucide-react';
 
 const WhatsApp = () => {
   const { user, loading: authLoading } = useAuth();
@@ -56,7 +57,11 @@ const WhatsApp = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="settings" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Configurações
+            </TabsTrigger>
             <TabsTrigger value="instances" className="flex items-center gap-2">
               <Smartphone className="h-4 w-4" />
               Instâncias
@@ -74,6 +79,10 @@ const WhatsApp = () => {
               Enviar
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="settings" className="mt-6">
+            <EvolutionApiSettings />
+          </TabsContent>
 
           <TabsContent value="instances" className="mt-6">
             <div className="grid gap-6 md:grid-cols-2">

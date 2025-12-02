@@ -1,1 +1,13 @@
-project_id = "zmdocbrbimcfsqmhyopy"
+project_id = "jmmiuvroxzjzaesaessi"
+
+[functions.whatsapp-user-manager]
+verify_jwt = true
+
+[functions.whatsapp-manager]
+verify_jwt = false
+
+[functions.google-maps-proxy]
+verify_jwt = false
+
+[functions.openai-gpt]
+verify_jwt = true
